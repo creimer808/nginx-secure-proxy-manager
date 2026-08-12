@@ -3,10 +3,10 @@ name: Build and publish container image
 on:
   push:
     branches:
-      - develop
+      - custom
   pull_request:
     branches:
-      - develop
+      - custom
   workflow_dispatch:
 
 concurrency:
@@ -79,7 +79,7 @@ jobs:
           tags: |
             type=ref,event=branch
             type=sha,prefix=sha-
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/develop' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/custom' }}
 
       - name: Build and publish image
         uses: docker/build-push-action@v6
