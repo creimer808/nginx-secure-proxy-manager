@@ -27,6 +27,34 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set application version
+        shell: bash
+        run: |
+          release_tag="$(git describe --tags --abbrev=0 --match 'v[0-9]*')"
+          release_version="${release_tag#v}"
+          if [[ ! "${release_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid release version derived from tag: ${release_tag}" >&2
+            exit 1
+          fi
+
+          app_version="${release_version}-custom"
+          for manifest in backend/package.json frontend/package.json; do
+            node - "${manifest}" "${app_version}" <<'NODE'
+          const fs = require("node:fs");
+          const [manifest, version] = process.argv.slice(2);
+          const source = fs.readFileSync(manifest, "utf8");
+          const updated = source.replace(/("version"\s*:\s*")[^"]+/, `$1${version}`);
+          if (updated === source) {
+            throw new Error(`Could not update version in ${manifest}`);
+          }
+          fs.writeFileSync(manifest, updated);
+          NODE
+          done
+
+          echo "APP_VERSION=${app_version}" >> "${GITHUB_ENV}"
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -91,7 +119,7 @@ jobs:
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
           build-args: |
-            BUILD_VERSION=${{ github.ref_name }}
+            BUILD_VERSION=${{ env.APP_VERSION }}
             BUILD_COMMIT=${{ github.sha }}
             BUILD_DATE=${{ github.event.head_commit.timestamp || github.event.repository.updated_at }}
           cache-from: type=gha
