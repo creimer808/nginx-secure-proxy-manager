@@ -320,6 +320,123 @@
 	"dashboard": {
 		"defaultMessage": "Dashboard"
 	},
+	"dashboard.metrics.bandwidth": {
+		"defaultMessage": "Bandwidth sent"
+	},
+	"dashboard.metrics.bucket": {
+		"defaultMessage": "Bucket"
+	},
+	"dashboard.metrics.client-errors": {
+		"defaultMessage": "Client errors (4xx)"
+	},
+	"dashboard.metrics.disabled": {
+		"defaultMessage": "Traffic metrics collection is disabled. Set TRAFFIC_METRICS_ENABLED to true to start collecting."
+	},
+	"dashboard.metrics.empty": {
+		"defaultMessage": "No traffic has been collected yet. Metrics will appear after the first collection cycle."
+	},
+	"dashboard.metrics.error": {
+		"defaultMessage": "Could not load security & traffic metrics."
+	},
+	"dashboard.metrics.error-retry": {
+		"defaultMessage": "Retry"
+	},
+	"dashboard.metrics.host": {
+		"defaultMessage": "Host"
+	},
+	"dashboard.metrics.no-data": {
+		"defaultMessage": "No data for the selected range."
+	},
+	"dashboard.metrics.requests": {
+		"defaultMessage": "Requests"
+	},
+	"dashboard.metrics.server-errors": {
+		"defaultMessage": "Server errors (5xx)"
+	},
+	"dashboard.metrics.source-ip": {
+		"defaultMessage": "Client IP"
+	},
+	"dashboard.metrics.source-note": {
+		"defaultMessage": "Top observed client IPs come from Nginx's observed remote address for 4xx/5xx responses. Deployments behind another reverse proxy may show that proxy's address. Rankings are approximate observations, not proof of attacks."
+	},
+	"dashboard.metrics.status-1xx": {
+		"defaultMessage": "1xx informational"
+	},
+	"dashboard.metrics.status-2xx": {
+		"defaultMessage": "2xx success"
+	},
+	"dashboard.metrics.status-3xx": {
+		"defaultMessage": "3xx redirect"
+	},
+	"dashboard.metrics.status-4xx": {
+		"defaultMessage": "4xx client error"
+	},
+	"dashboard.metrics.status-5xx": {
+		"defaultMessage": "5xx server error"
+	},
+	"dashboard.metrics.summary": {
+		"defaultMessage": "Traffic summary"
+	},
+	"dashboard.metrics.title": {
+		"defaultMessage": "Security & Traffic"
+	},
+	"dashboard.metrics.top-hosts": {
+		"defaultMessage": "Top proxy hosts"
+	},
+	"dashboard.metrics.top-sources": {
+		"defaultMessage": "Top observed client IPs"
+	},
+	"dashboard.metrics.total": {
+		"defaultMessage": "Observed errors"
+	},
+	"dashboard.metrics.trend": {
+		"defaultMessage": "Historical trend"
+	},
+	"dashboard.metrics.updating": {
+		"defaultMessage": "Updating…"
+	},
+	"dashboard.posture.access-controlled": {
+		"defaultMessage": "Access list"
+	},
+	"dashboard.posture.certificate-configured": {
+		"defaultMessage": "Certificate configured"
+	},
+	"dashboard.posture.certificates-expired": {
+		"defaultMessage": "Expired certificates"
+	},
+	"dashboard.posture.certificates-expiring": {
+		"defaultMessage": "Certificates expiring (30d)"
+	},
+	"dashboard.posture.disabled": {
+		"defaultMessage": "Disabled hosts"
+	},
+	"dashboard.posture.effective-hsts": {
+		"defaultMessage": "Effective HSTS"
+	},
+	"dashboard.posture.enabled": {
+		"defaultMessage": "Enabled hosts"
+	},
+	"dashboard.posture.exploit-rules": {
+		"defaultMessage": "Exploit rules enabled"
+	},
+	"dashboard.posture.forced-https": {
+		"defaultMessage": "Forcing HTTPS"
+	},
+	"dashboard.posture.note": {
+		"defaultMessage": "Configuration observations for visible proxy hosts. These are counts, not a security score."
+	},
+	"dashboard.posture.title": {
+		"defaultMessage": "Security posture"
+	},
+	"dashboard.range.24h": {
+		"defaultMessage": "24 hours"
+	},
+	"dashboard.range.30d": {
+		"defaultMessage": "30 days"
+	},
+	"dashboard.range.7d": {
+		"defaultMessage": "7 days"
+	},
 	"dead-host": {
 		"defaultMessage": "404 Host"
 	},

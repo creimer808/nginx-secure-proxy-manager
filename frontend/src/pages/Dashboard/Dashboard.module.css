@@ -1,0 +1,177 @@
+.rangeGroup {
+	display: inline-flex;
+	gap: 0.25rem;
+	margin-bottom: 1rem;
+}
+
+.rangeButton {
+	border: 1px solid rgba(97, 105, 118, 0.3);
+	background: transparent;
+	color: inherit;
+	border-radius: 4px;
+	padding: 0.25rem 0.75rem;
+	cursor: pointer;
+	line-height: 1.2;
+}
+
+.rangeButton:hover {
+	background: rgba(97, 105, 118, 0.1);
+}
+
+.rangeButtonSelected {
+	background: var(--tblr-primary, #0054a6);
+	color: #fff;
+	border-color: var(--tblr-primary, #0054a6);
+}
+
+.rangeButton:focus-visible {
+	outline: 2px solid var(--tblr-primary, #0054a6);
+	outline-offset: 2px;
+}
+
+.metricGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	gap: 0.75rem;
+	margin-bottom: 1rem;
+}
+
+.metricCard {
+	border: 1px solid rgba(97, 105, 118, 0.2);
+	border-radius: 6px;
+	padding: 0.75rem;
+}
+
+.metricValue {
+	font-size: 1.5rem;
+	font-weight: 600;
+	line-height: 1.2;
+}
+
+.metricLabel {
+	color: var(--tblr-secondary, #6b7280);
+	font-size: 0.85rem;
+}
+
+.chart {
+	display: flex;
+	align-items: flex-end;
+	gap: 2px;
+	height: 120px;
+	margin-top: 0.5rem;
+	overflow: hidden;
+}
+
+.bar {
+	flex: 1 1 0;
+	min-width: 2px;
+	display: flex;
+	flex-direction: column-reverse;
+	border-radius: 2px 2px 0 0;
+	overflow: hidden;
+}
+
+.bar2xx {
+	background: var(--tblr-success, #2fb344);
+}
+
+.bar3xx {
+	background: var(--tblr-info, #4299e1);
+}
+
+.bar4xx {
+	background: var(--tblr-warning, #f59f00);
+}
+
+.bar5xx {
+	background: var(--tblr-danger, #d63939);
+}
+
+.bar1xx {
+	background: var(--tblr-secondary, #6b7280);
+}
+
+.legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	margin-top: 0.5rem;
+	font-size: 0.8rem;
+}
+
+.legendItem {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.legendSwatch {
+	display: inline-block;
+	width: 0.75rem;
+	height: 0.75rem;
+	border-radius: 2px;
+}
+
+.postureGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 0.5rem 1rem;
+}
+
+.postureItem {
+	display: flex;
+	justify-content: space-between;
+	gap: 0.5rem;
+	padding: 0.2rem 0;
+	border-bottom: 1px solid rgba(97, 105, 118, 0.1);
+}
+
+.table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.9rem;
+}
+
+.table th,
+.table td {
+	text-align: left;
+	padding: 0.4rem 0.5rem;
+	border-bottom: 1px solid rgba(97, 105, 118, 0.15);
+}
+
+.table th {
+	font-weight: 600;
+	color: var(--tblr-secondary, #6b7280);
+}
+
+.table td {
+	font-variant-numeric: tabular-nums;
+}
+
+.srOnly {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	margin: -1px;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+.note {
+	color: var(--tblr-secondary, #6b7280);
+	font-size: 0.8rem;
+	margin-top: 0.5rem;
+}
+
+.retryButton {
+	margin-top: 0.5rem;
+}
+
+@media (max-width: 575.98px) {
+	.chart {
+		height: 90px;
+	}
+}

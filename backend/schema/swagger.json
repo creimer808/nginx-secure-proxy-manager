@@ -262,6 +262,11 @@
 				"$ref": "./paths/nginx/streams/streamID/disable/post.json"
 			}
 		},
+		"/reports/dashboard": {
+			"get": {
+				"$ref": "./paths/reports/dashboard/get.json"
+			}
+		},
 		"/reports/hosts": {
 			"get": {
 				"$ref": "./paths/reports/hosts/get.json"

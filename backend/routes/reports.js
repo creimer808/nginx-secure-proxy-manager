@@ -29,4 +29,29 @@ router
 		}
 	});
 
+router
+	.route("/dashboard")
+	.options((_, res) => {
+		res.sendStatus(204);
+	})
+	.all(jwtdecode())
+
+	/**
+	 * GET /reports/dashboard?range=24h|7d|30d
+	 *
+	 * The response may contain raw client IP addresses, so it is never cached.
+	 */
+	.get(async (req, res, next) => {
+		try {
+			const range = req.query.range;
+			const data = await internalReport.getDashboardReport(res.locals.access, range);
+			// Override the global no-cache header: raw IPs must not be stored by shared caches.
+			res.set("Cache-Control", "private, no-store");
+			res.status(200).send(data);
+		} catch (err) {
+			debug(logger, `${req.method.toUpperCase()} ${req.path}: ${err}`);
+			next(err);
+		}
+	});
+
 export default router;

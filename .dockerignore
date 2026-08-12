@@ -1,0 +1,8 @@
+.git
+.github
+.pi
+plans
+**/node_modules
+**/.DS_Store
+frontend/dist/**/*.map
+test/results

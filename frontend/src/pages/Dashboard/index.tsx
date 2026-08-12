@@ -4,6 +4,7 @@ import { HasPermission } from "src/components";
 import { useHostReport } from "src/hooks";
 import { T } from "src/locale";
 import { DEAD_HOSTS, PROXY_HOSTS, REDIRECTION_HOSTS, STREAMS, VIEW } from "src/modules/Permissions";
+import SecurityTrafficDashboard from "./SecurityTrafficDashboard";
 
 const Dashboard = () => {
 	const { data: hostReport } = useHostReport();
@@ -124,6 +125,13 @@ const Dashboard = () => {
 						</HasPermission>
 					</div>
 				</div>
+
+				{/* Security & Traffic panel. Host-count cards above stay usable if this report fails. */}
+				<HasPermission section={PROXY_HOSTS} permission={VIEW} hideError>
+					<div className="col-12 mt-4">
+						<SecurityTrafficDashboard />
+					</div>
+				</HasPermission>
 			</div>
 		</div>
 	);

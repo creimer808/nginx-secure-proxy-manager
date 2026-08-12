@@ -1,0 +1,228 @@
+{
+	"operationId": "reportsDashboard",
+	"summary": "Security & Traffic Dashboard Report",
+	"description": "Returns aggregated proxy-host traffic, security posture, historical series, top hosts and top observed client IPs for the selected range.\n\nAuthorization is enforced server-side: metrics are always joined to active proxy hosts and filtered by the requesting user's visibility. A user without global visibility cannot observe counts, domains or IP addresses belonging to another user's hosts.\n\nTop observed client IPs are approximate (top 10 per host/day) and derived from Nginx's observed remote address for 4xx/5xx responses only. Deployments behind another reverse proxy may see that proxy's address unless trusted real-IP handling is configured. They are observations, not proof of attacks.\n\n`effective_hsts` requires a certificate, forced HTTPS and HSTS enabled. `exploit_rules_enabled` counts hosts with exploit-blocking rules enabled.\n\nCollection can be disabled with the `TRAFFIC_METRICS_ENABLED=false` environment variable, in which case traffic fields are zero and `collection.enabled` is false.",
+	"tags": ["reports"],
+	"security": [
+		{
+			"bearerAuth": []
+		}
+	],
+	"parameters": [
+		{
+			"name": "range",
+			"in": "query",
+			"required": true,
+			"description": "Time range for the report.",
+			"schema": {
+				"type": "string",
+				"enum": ["24h", "7d", "30d"]
+			}
+		}
+	],
+	"responses": {
+		"200": {
+			"description": "200 response",
+			"headers": {
+				"Cache-Control": {
+					"description": "Raw client IP addresses may be present, so the response is never stored by shared caches.",
+					"schema": {
+						"type": "string",
+						"example": "private, no-store"
+					}
+				}
+			},
+			"content": {
+				"application/json": {
+					"examples": {
+						"default": {
+							"value": {
+								"range": "24h",
+								"generated_at": 1786550400,
+								"collection": {
+									"enabled": true
+								},
+								"posture": {
+									"enabled": 12,
+									"disabled": 1,
+									"certificate_configured": 11,
+									"forced_https": 10,
+									"effective_hsts": 8,
+									"exploit_rules_enabled": 9,
+									"access_controlled": 4,
+									"certificates_expired": 0,
+									"certificates_expiring": 2
+								},
+								"traffic": {
+									"requests": 185430,
+									"bytes_sent": 924728233,
+									"status_1xx": 0,
+									"status_2xx": 179240,
+									"status_3xx": 3210,
+									"status_4xx": 2710,
+									"status_5xx": 270
+								},
+								"series": [
+									{
+										"bucket_start": 1786544000,
+										"request_count": 1200,
+										"status_1xx": 0,
+										"status_2xx": 1100,
+										"status_3xx": 40,
+										"status_4xx": 50,
+										"status_5xx": 10
+									}
+								],
+								"top_hosts": [
+									{
+										"id": 1,
+										"domain": "example.com",
+										"request_count": 90000,
+										"bytes_sent": 400000000,
+										"status_4xx": 1000,
+										"status_5xx": 100
+									}
+								],
+								"top_sources": {
+									"approximate": true,
+									"items": [
+										{
+											"client_ip": "203.0.113.25",
+											"proxy_host_id": 1,
+											"domain": "example.com",
+											"status_4xx": 40,
+											"status_5xx": 2,
+											"observed_count": 42
+										}
+									]
+								}
+							}
+						}
+					},
+					"schema": {
+						"type": "object",
+						"required": ["range", "generated_at", "collection", "posture", "traffic", "series", "top_hosts", "top_sources"],
+						"properties": {
+							"range": {
+								"type": "string",
+								"enum": ["24h", "7d", "30d"]
+							},
+							"generated_at": {
+								"type": "integer",
+								"description": "UTC epoch second timestamp when the report was generated."
+							},
+							"collection": {
+								"type": "object",
+								"required": ["enabled"],
+								"properties": {
+									"enabled": {
+										"type": "boolean",
+										"description": "Whether background traffic metrics collection is enabled."
+									}
+								}
+							},
+							"posture": {
+								"type": "object",
+								"description": "Configuration posture counts over visible active proxy hosts. Observations, not a security score.",
+								"required": ["enabled", "disabled", "certificate_configured", "forced_https", "effective_hsts", "exploit_rules_enabled", "access_controlled", "certificates_expired", "certificates_expiring"],
+								"properties": {
+									"enabled": { "type": "integer" },
+									"disabled": { "type": "integer" },
+									"certificate_configured": { "type": "integer", "description": "Hosts with a certificate configured." },
+									"forced_https": { "type": "integer" },
+									"effective_hsts": { "type": "integer", "description": "Hosts with a certificate, forced HTTPS and HSTS enabled." },
+									"exploit_rules_enabled": { "type": "integer", "description": "Hosts with exploit-blocking rules enabled." },
+									"access_controlled": { "type": "integer", "description": "Hosts using an access list." },
+									"certificates_expired": { "type": "integer" },
+									"certificates_expiring": { "type": "integer", "description": "Certificates expiring within 30 days." }
+								}
+							},
+							"traffic": {
+								"type": "object",
+								"required": ["requests", "bytes_sent", "status_1xx", "status_2xx", "status_3xx", "status_4xx", "status_5xx"],
+								"properties": {
+									"requests": { "type": "integer" },
+									"bytes_sent": { "type": "integer" },
+									"status_1xx": { "type": "integer" },
+									"status_2xx": { "type": "integer" },
+									"status_3xx": { "type": "integer" },
+									"status_4xx": { "type": "integer" },
+									"status_5xx": { "type": "integer" }
+								}
+							},
+							"series": {
+								"type": "array",
+								"description": "Hourly buckets for 24h, daily buckets for 7d/30d.",
+								"items": {
+									"type": "object",
+									"required": ["bucket_start", "request_count", "status_1xx", "status_2xx", "status_3xx", "status_4xx", "status_5xx"],
+									"properties": {
+										"bucket_start": { "type": "integer", "description": "UTC epoch second start of the bucket." },
+										"request_count": { "type": "integer" },
+										"status_1xx": { "type": "integer" },
+										"status_2xx": { "type": "integer" },
+										"status_3xx": { "type": "integer" },
+										"status_4xx": { "type": "integer" },
+										"status_5xx": { "type": "integer" }
+									}
+								}
+							},
+							"top_hosts": {
+								"type": "array",
+								"maxItems": 10,
+								"items": {
+									"type": "object",
+									"required": ["id", "domain", "request_count", "bytes_sent", "status_4xx", "status_5xx"],
+									"properties": {
+										"id": { "type": "integer" },
+										"domain": { "type": "string", "description": "Primary domain." },
+										"request_count": { "type": "integer" },
+										"bytes_sent": { "type": "integer" },
+										"status_4xx": { "type": "integer" },
+										"status_5xx": { "type": "integer" }
+									}
+								}
+							},
+							"top_sources": {
+								"type": "object",
+								"required": ["approximate", "items"],
+								"properties": {
+									"approximate": {
+										"type": "boolean",
+										"description": "Always true. Source rankings are approximate top-N observations."
+									},
+									"items": {
+										"type": "array",
+										"maxItems": 10,
+										"items": {
+											"type": "object",
+											"required": ["client_ip", "proxy_host_id", "domain", "status_4xx", "status_5xx", "observed_count"],
+											"properties": {
+												"client_ip": { "type": "string", "description": "Observed client IP address." },
+												"proxy_host_id": { "type": "integer" },
+												"domain": { "type": "string" },
+												"status_4xx": { "type": "integer" },
+												"status_5xx": { "type": "integer" },
+												"observed_count": { "type": "integer", "description": "Total observed 4xx/5xx responses." }
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"400": {
+			"description": "Invalid range",
+			"content": {
+				"application/json": {
+					"schema": {
+						"$ref": "../../../components/error.json"
+					}
+				}
+			}
+		}
+	}
+}

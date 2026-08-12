@@ -6,6 +6,7 @@
     missingok
     notifempty
     compress
+    delaycompress
     sharedscripts
     postrotate
     kill -USR1 `cat /run/nginx/nginx.pid 2>/dev/null` 2>/dev/null || true
