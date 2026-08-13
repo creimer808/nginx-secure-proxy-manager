@@ -32,12 +32,12 @@ describe("Login version identity", () => {
 	afterEach(() => cleanup());
 
 	it("renders separate release links for the app and upstream compatibility baseline", () => {
-		useHealth.mockReturnValue({ data: { appVersion: "0.1.0", upstreamVersion: "2.15.1" } });
+		useHealth.mockReturnValue({ data: { appVersion: "0.1.1", upstreamVersion: "2.15.1" } });
 		render(<Login />);
 
-		expect(screen.getByRole("link", { name: "version.app:0.1.0" })).toHaveAttribute(
+		expect(screen.getByRole("link", { name: "version.app:0.1.1" })).toHaveAttribute(
 			"href",
-			"https://github.com/creimer808/nginx-proxy-manager/releases/tag/v0.1.0",
+			"https://github.com/creimer808/nginx-proxy-manager/releases/tag/v0.1.1",
 		);
 		expect(screen.getByRole("link", { name: "version.upstream:2.15.1" })).toHaveAttribute(
 			"href",

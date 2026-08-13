@@ -2,7 +2,7 @@
 	"openapi": "3.1.0",
 	"info": {
 		"title": "Nginx Secure Proxy Manager API",
-		"version": "0.1.0",
+		"version": "0.1.1",
 		"description": "API documentation for Nginx Secure Proxy Manager (NSPM), an unofficial fork based on Nginx Proxy Manager.\n\nMost endpoints require authentication via Bearer Token (JWT). You can generate a token by logging in via the `POST /tokens` endpoint.\n\nFor more information, visit [CyberSec.Cam](https://www.cybersec.cam)."
 	},
 	"servers": [
