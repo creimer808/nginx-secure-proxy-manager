@@ -1,7 +1,7 @@
 import https from "node:https";
 import { ProxyAgent } from "proxy-agent";
 import { debug, remoteVersion as logger } from "../logger.js";
-import pjson from "../package.json" with { type: "json" };
+import { resolveVersions } from "../lib/version.js";
 
 const VERSION_URL = "https://api.github.com/repos/NginxProxyManager/nginx-proxy-manager/releases/latest";
 
@@ -29,8 +29,8 @@ const internalRemoteVersion = {
 		}
 
 		const latestVersion = internalRemoteVersion.last_result.tag_name;
-		const version = pjson.version.split("-").shift().split(".");
-		const currentVersion = `v${version[0]}.${version[1]}.${version[2]}`;
+		const { upstream } = resolveVersions();
+		const currentVersion = `v${upstream.normalized}`;
 		return {
 			current: currentVersion,
 			latest: latestVersion,
@@ -41,7 +41,7 @@ const internalRemoteVersion = {
 	fetchUrl: (url) => {
 		const agent = new ProxyAgent();
 		const headers = {
-			"User-Agent": `NginxProxyManager v${pjson.version}`,
+			"User-Agent": "NginxSecureProxyManager upstream-version-check",
 		};
 
 		return new Promise((resolve, reject) => {
@@ -63,6 +63,7 @@ const internalRemoteVersion = {
 		});
 	},
 
+	// This check intentionally follows the upstream compatibility baseline, not NSPM releases.
 	compareVersions: (current, latest) => {
 		const cleanCurrent = current.replace(/^v/, "");
 		const cleanLatest = latest.replace(/^v/, "");

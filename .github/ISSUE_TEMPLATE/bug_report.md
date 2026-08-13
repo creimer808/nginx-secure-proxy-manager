@@ -1,55 +1,43 @@
 ---
 name: Bug report
-about: Create a report to help us improve
-title: ''
+about: Report a reproducible Nginx Secure Proxy Manager problem
+title: ""
 labels: bug
-assignees: ''
-
+assignees: ""
 ---
-<!--
- 
-Are you in the right place?
-- If you are looking for support on how to get your upstream server forwarding, please consider asking the community on Reddit.
-- If you are writing code changes to contribute and need to ask about the internals of the software, Gitter is the best place to ask.
-- If you think you found a bug with NPM (not Nginx, or your upstream server or MySql) then you are in the *right place.*
 
--->
+## Checklist
 
-**Checklist**
-- Have you pulled and found the error with `jc21/nginx-proxy-manager:latest` docker image?
-  - Yes / No
-- Are you sure you're not using someone else's docker image?
-  - Yes / No
-- Have you searched for similar issues (both open and closed)?
-  - Yes / No
+- [ ] I am using `ghcr.io/creimer808/nginx-proxy-manager`, not an upstream or third-party image.
+- [ ] I searched open and closed issues in this repository.
+- [ ] I removed secrets, tokens, private keys, and internal-only data from this report.
 
-**Describe the bug**
-<!-- A clear and concise description of what the bug is. -->
+## Describe the bug
 
+<!-- Explain what happened and why it is unexpected. -->
 
-**Nginx Proxy Manager Version**
-<!-- What version of Nginx Proxy Manager is reported on the login page? -->
+## Versions
 
+<!-- Include both values shown in the login/footer: NSPM app version and upstream NPM compatibility version. Also include the image tag or digest. -->
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+- NSPM version:
+- Upstream NPM compatibility version:
+- Image tag or digest:
 
+## To reproduce
 
-**Expected behavior**
-<!-- A clear and concise description of what you expected to happen. -->
+1.
+2.
+3.
 
+## Expected behavior
 
-**Screenshots**
-<!-- If applicable, add screenshots to help explain your problem. -->
+<!-- What should have happened? -->
 
+## Environment
 
-**Operating System**
-<!-- Please specify if using a Rpi, Mac, orchestration tool or any other setups that might affect the reproduction of this error. -->
+<!-- OS, architecture, Docker/Compose version, database type, browser, and any relevant non-secret configuration. -->
 
+## Additional context
 
-**Additional context**
-<!-- Add any other context about the problem here, docker version, browser version, logs if applicable to the problem. Too much info is better than too little. -->
+<!-- Logs and screenshots are useful after redacting domains, IPs, tokens, certificates, and credentials. -->

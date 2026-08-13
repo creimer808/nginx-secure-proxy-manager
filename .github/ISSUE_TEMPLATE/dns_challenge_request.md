@@ -1,18 +1,15 @@
 ---
 name: DNS challenge provider request
-about: Suggest a new provider to be available for a certificate DNS challenge
-title: ''
+about: Suggest a Certbot DNS provider for Nginx Secure Proxy Manager
+title: ""
 labels: dns provider request
-assignees: ''
-
+assignees: ""
 ---
 
-**What provider would you like to see added to NPM?**
-<!-- What is this provider called? -->
+## Provider
 
+<!-- Which provider should NSPM support? Do not include credentials. -->
 
-**Have you checked if a certbot plugin exists?**
-<!-- 
-Currently NPM only supports DNS challenge providers for which a certbot plugin exists. 
-You can visit pypi.org, and search for a package with the name `certbot-dns-<privider>`.
--->
+## Certbot plugin
+
+<!-- NSPM inherits Nginx Proxy Manager's Certbot behavior. Check PyPI for `certbot-dns-<provider>` and link the package/repository. -->

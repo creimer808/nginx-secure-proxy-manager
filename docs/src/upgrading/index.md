@@ -4,13 +4,13 @@ outline: deep
 
 # Upgrading
 
+1. Review the [NSPM releases](https://github.com/creimer808/nginx-proxy-manager/releases) and any matching upstream compatibility notes.
+2. Update the pinned NSPM image tag or digest in `docker-compose.yml`.
+3. Pull and recreate the service:
+
 ```bash
 docker compose pull
 docker compose up -d
 ```
 
-This project will automatically update any databases or other requirements so you don't have to follow
-any crazy instructions. These steps above will pull the latest updates and recreate the docker
-containers.
-
-See the [list of releases](https://github.com/NginxProxyManager/nginx-proxy-manager/releases) for any upgrade steps specific to each release.
+A pinned tag does not change when you run `docker compose pull`; update the tag or digest first. NSPM performs required database migrations at startup. Review upstream notes only as compatibility references, because an upstream release does not automatically create an NSPM release.

@@ -170,34 +170,43 @@ export default function Login() {
 	const { twoFactorChallenge } = useAuthState();
 	const health = useHealth();
 
-	const getVersion = () => {
-		if (!health.data) {
-			return "";
-		}
-		const v = health.data.version;
-		return `v${v.major}.${v.minor}.${v.revision}`;
-	};
-
 	return (
 		<Page className="page page-center">
 			<div className="container container-tight py-4">
 				<div className="d-flex justify-content-between align-items-center mb-4 ps-4 pe-3">
-					<img
-						className={styles.logo}
-						src="/images/logo-text-horizontal-grey.png"
-						alt="Nginx Proxy Manager"
-					/>
+					<div className={styles.brand}>
+						<img src="/images/nspm-shield.svg" alt="" width={48} height={54} />
+						<span>Nginx Secure Proxy Manager</span>
+					</div>
 					<div className="d-flex align-items-center gap-1">
 						<LocalePicker />
 						<ThemeSwitcher />
 					</div>
 				</div>
 				<div className="card card-md">
-					<div className="card-body">
-						{twoFactorChallenge ? <TwoFactorForm /> : <LoginForm />}
-					</div>
+					<div className="card-body">{twoFactorChallenge ? <TwoFactorForm /> : <LoginForm />}</div>
 				</div>
-				<div className="text-center text-secondary mt-3">{getVersion()}</div>
+				{health.data && (
+					<div className="text-center text-secondary mt-3">
+						<a
+							href={`https://github.com/creimer808/nginx-proxy-manager/releases/tag/v${health.data.appVersion}`}
+							className="link-secondary"
+							target="_blank"
+							rel="noopener noreferrer"
+						>
+							<T id="version.app" data={{ version: health.data.appVersion }} />
+						</a>
+						<span aria-hidden="true"> · </span>
+						<a
+							href={`https://github.com/NginxProxyManager/nginx-proxy-manager/releases/tag/v${health.data.upstreamVersion}`}
+							className="link-secondary"
+							target="_blank"
+							rel="noopener noreferrer"
+						>
+							<T id="version.upstream" data={{ version: health.data.upstreamVersion }} />
+						</a>
+					</div>
+				)}
 			</div>
 		</Page>
 	);

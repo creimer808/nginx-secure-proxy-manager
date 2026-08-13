@@ -416,6 +416,12 @@
 	"footer.github-fork": {
 		"defaultMessage": "Forknite ma na GitHube"
 	},
+	"footer.nspm-github": {
+		"defaultMessage": "NSPM on GitHub"
+	},
+	"footer.upstream-npm": {
+		"defaultMessage": "Upstream NPM"
+	},
 	"host.flags.block-exploits": {
 		"defaultMessage": "Blokovať bežné exploity"
 	},
@@ -766,5 +772,17 @@
 	},
 	"users": {
 		"defaultMessage": "Používatelia"
+	},
+	"version.app": {
+		"defaultMessage": "NSPM v{version}"
+	},
+	"version.upstream": {
+		"defaultMessage": "Based on NPM v{version}"
+	},
+	"version.upstream-update": {
+		"defaultMessage": "Upstream NPM update: {version}"
+	},
+	"version.upstream-update-title": {
+		"defaultMessage": "New upstream NPM version {version} is available"
 	}
 }

@@ -350,6 +350,12 @@
 	"footer.github-fork": {
 		"defaultMessage": "在 Github 上复刻 (Fork) 本项目"
 	},
+	"footer.nspm-github": {
+		"defaultMessage": "NSPM on GitHub"
+	},
+	"footer.upstream-npm": {
+		"defaultMessage": "Upstream NPM"
+	},
 	"host.flags.block-exploits": {
 		"defaultMessage": "阻止常见攻击"
 	},
@@ -658,5 +664,17 @@
 	},
 	"users": {
 		"defaultMessage": "用户列表"
+	},
+	"version.app": {
+		"defaultMessage": "NSPM v{version}"
+	},
+	"version.upstream": {
+		"defaultMessage": "Based on NPM v{version}"
+	},
+	"version.upstream-update": {
+		"defaultMessage": "Upstream NPM update: {version}"
+	},
+	"version.upstream-update-title": {
+		"defaultMessage": "New upstream NPM version {version} is available"
 	}
 }

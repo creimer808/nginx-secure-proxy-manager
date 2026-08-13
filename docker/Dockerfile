@@ -3,14 +3,17 @@
 
 # This file assumes that the frontend has been built using ./scripts/frontend-build
 
-ARG BASE_IMAGE=nginxproxymanager/nginx-full:certbot-node
-FROM nginxproxymanager/testca AS testca
+# Update these reviewed index digests through the stable upstream-sync process in UPSTREAM.md.
+ARG BASE_IMAGE=nginxproxymanager/nginx-full:certbot-node@sha256:f5e8c2a11d4f91807b9df9f823f6ec90b40366717fc0892fb342866a8eadb240
+FROM nginxproxymanager/testca@sha256:3e23c78c64789b8e95126589dd502127e57bbad6091a5a88a67ffb87a16f6b6a AS testca
 FROM $BASE_IMAGE
 
+ARG BASE_IMAGE
 ARG TARGETPLATFORM
 ARG BUILD_VERSION
 ARG BUILD_COMMIT
 ARG BUILD_DATE
+ARG UPSTREAM_VERSION
 
 # See: https://github.com/just-containers/s6-overlay/blob/master/README.md
 ENV SUPPRESS_NO_CONFIG_WARNING=1 \
@@ -23,6 +26,7 @@ ENV SUPPRESS_NO_CONFIG_WARNING=1 \
 	NPM_BUILD_VERSION="${BUILD_VERSION}" \
 	NPM_BUILD_COMMIT="${BUILD_COMMIT}" \
 	NPM_BUILD_DATE="${BUILD_DATE}" \
+	NSPM_UPSTREAM_VERSION="${UPSTREAM_VERSION}" \
 	NODE_OPTIONS="--openssl-legacy-provider"
 
 RUN echo "fs.file-max = 65535" > /etc/sysctl.conf \
@@ -59,8 +63,14 @@ ENTRYPOINT [ "/init" ]
 
 LABEL org.label-schema.schema-version="1.0" \
 	org.label-schema.license="MIT" \
-	org.label-schema.name="nginx-proxy-manager" \
-	org.label-schema.description="Docker container for managing Nginx proxy hosts with a simple, powerful interface " \
-	org.label-schema.url="https://github.com/jc21/nginx-proxy-manager" \
-	org.label-schema.vcs-url="https://github.com/jc21/nginx-proxy-manager.git" \
-	org.label-schema.cmd="docker run --rm -ti jc21/nginx-proxy-manager:latest"
+	org.label-schema.name="nginx-secure-proxy-manager" \
+	org.label-schema.description="Security-focused Nginx Proxy Manager fork with traffic visibility" \
+	org.label-schema.url="https://github.com/creimer808/nginx-proxy-manager" \
+	org.label-schema.vcs-url="https://github.com/creimer808/nginx-proxy-manager.git" \
+	org.label-schema.cmd="docker run --rm -ti ghcr.io/creimer808/nginx-proxy-manager:latest" \
+	org.opencontainers.image.version="${BUILD_VERSION}" \
+	org.opencontainers.image.revision="${BUILD_COMMIT}" \
+	org.opencontainers.image.created="${BUILD_DATE}" \
+	org.opencontainers.image.source="https://github.com/creimer808/nginx-proxy-manager" \
+	org.opencontainers.image.base.name="${BASE_IMAGE}" \
+	io.cybersec-cam.nspm.upstream-version="${UPSTREAM_VERSION}"

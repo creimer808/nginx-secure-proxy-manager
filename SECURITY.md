@@ -1,30 +1,27 @@
 # Security Policy
 
-## Supported Versions
+## Supported versions
 
-Only the latest stable release receives security updates.
-Older versions are not actively maintained.
+Only the latest stable **Nginx Secure Proxy Manager** release is supported with fork-specific security fixes.
 
-| Version | Supported |
-| ------- | --------- |
-| 2.15.x (latest) | :white_check_mark: |
-| < 2.15.0 | :x: |
+| NSPM version | Upstream compatibility baseline | Supported |
+| --- | --- | --- |
+| 0.1.x | Nginx Proxy Manager 2.15.x | :white_check_mark: |
+| Older NSPM releases | Any | :x: |
 
-Docker images: `jc21/nginx-proxy-manager:latest`, `jc21/nginx-proxy-manager:2`
+Images are published at `ghcr.io/creimer808/nginx-proxy-manager`. Pin an NSPM image digest in production. Protect GitHub release tags and keep GHCR numeric tags immutable; `latest` is intentionally mutable. An upstream NPM release notification indicates a compatibility update to review, not an NSPM image release.
 
-See all releases: https://github.com/NginxProxyManager/nginx-proxy-manager/releases
+## Reporting a vulnerability
 
-## Reporting a Vulnerability
+**Do not open a public issue for a security vulnerability.** Use this repository's private vulnerability-reporting feature:
 
-**Do NOT open a public GitHub Issue to report a security vulnerability.**
+<https://github.com/creimer808/nginx-proxy-manager/security/advisories/new>
 
-Use GitHub's private vulnerability reporting:
-https://github.com/NginxProxyManager/nginx-proxy-manager/security/advisories/new
+Include:
 
-Please include:
-- Affected version (Docker image tag or release)
-- Description of the vulnerability
-- Steps to reproduce
-- Potential impact
+- NSPM application version and upstream compatibility version shown in the UI
+- Image digest or tag
+- Affected configuration and deployment type (without secrets)
+- Reproduction steps, impact, and any proof of concept
 
-Once a fix is available, a public GitHub Security Advisory will be published.
+Please redact credentials, JWTs, private keys, certificate contents, internal hostnames, and customer data. If the issue reproduces in an unmodified upstream Nginx Proxy Manager release, report it to the [upstream security process](https://github.com/NginxProxyManager/nginx-proxy-manager/security/advisories/new) as well.

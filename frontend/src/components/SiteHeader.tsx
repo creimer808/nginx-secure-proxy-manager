@@ -25,18 +25,19 @@ export function SiteHeader() {
 				>
 					<span className="navbar-toggler-icon" />
 				</button>
-				<div className="navbar-brand navbar-brand-autodark pe-0 pe-md-3">
+				<div className="navbar-brand pe-0 pe-md-3">
 					<NavLink to="/">
 						<div className={styles.logo}>
 							<img
-								src="/images/logo-no-text.svg"
+								src="/images/nspm-shield.svg"
 								width={40}
 								height={40}
 								className="navbar-brand-image"
-								alt="Logo"
+								alt=""
 							/>
 						</div>
-						Nginx Proxy Manager
+						<span className={styles.mobileName}>NSPM</span>
+						<span className={styles.desktopName}>Nginx Secure Proxy Manager</span>
 					</NavLink>
 				</div>
 				<div className="navbar-nav flex-row order-md-last">
@@ -72,7 +73,10 @@ export function SiteHeader() {
 							<div className="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
 								<div className="d-md-none">
 									{/* biome-ignore lint/a11y/noStaticElementInteractions lint/a11y/useKeyWithClickEvents: This div is not interactive. */}
-									<div className="p-2 pb-1 pe-1 d-flex align-items-center" onClick={e => e.stopPropagation()}>
+									<div
+										className="p-2 pb-1 pe-1 d-flex align-items-center"
+										onClick={(e) => e.stopPropagation()}
+									>
 										<div className="ps-2 pe-1 me-auto">
 											<div>{currentUser?.nickname}</div>
 											<div className="mt-1 small text-secondary text-nowrap">

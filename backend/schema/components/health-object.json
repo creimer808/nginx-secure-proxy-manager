@@ -2,7 +2,7 @@
 	"type": "object",
 	"description": "Health object",
 	"additionalProperties": false,
-	"required": ["status", "version"],
+	"required": ["status", "version", "app_version", "upstream_version"],
 	"properties": {
 		"status": {
 			"type": "string",
@@ -13,6 +13,16 @@
 			"type": "boolean",
 			"description": "Whether the initial setup has been completed",
 			"example": true
+		},
+		"app_version": {
+			"type": "string",
+			"description": "Nginx Secure Proxy Manager application version",
+			"example": "0.1.0"
+		},
+		"upstream_version": {
+			"type": "string",
+			"description": "Nginx Proxy Manager compatibility baseline",
+			"example": "2.15.1"
 		},
 		"version": {
 			"type": "object",

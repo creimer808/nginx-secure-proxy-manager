@@ -66,11 +66,10 @@ export default function Setup() {
 			</div>
 			<div className="container container-tight py-4">
 				<div className="text-center mb-4">
-					<img
-						className={styles.logo}
-						src="/images/logo-text-horizontal-grey.png"
-						alt="Nginx Proxy Manager"
-					/>
+					<div className={styles.brand}>
+						<img src="/images/nspm-shield.svg" alt="" width={48} height={54} />
+						<span>Nginx Secure Proxy Manager</span>
+					</div>
 				</div>
 				<div className="card card-md">
 					<Alert variant="danger" show={!!errorMsg} onClose={() => setErrorMsg(null)} dismissible>

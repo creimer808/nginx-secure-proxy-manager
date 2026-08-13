@@ -23,7 +23,8 @@ docker build --pull --no-cache --compress \
 	--progress=plain \
 	--build-arg TARGETPLATFORM=linux/amd64 \
 	--build-arg BUILDPLATFORM=linux/amd64 \
-	--build-arg BUILD_VERSION="${BUILD_VERSION:-unknown}" \
+	--build-arg BUILD_VERSION="${BUILD_VERSION:-$(tr -d '[:space:]' < .app-version)}" \
+	--build-arg UPSTREAM_VERSION="${UPSTREAM_VERSION:-$(tr -d '[:space:]' < .version)}" \
 	--build-arg BUILD_COMMIT="${BUILD_COMMIT:-unknown}" \
 	--build-arg BUILD_DATE="$(date '+%Y-%m-%d %T %Z')" \
 	.

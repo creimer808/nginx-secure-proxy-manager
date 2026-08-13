@@ -344,6 +344,12 @@
 	"footer.github-fork": {
 		"defaultMessage": "Fork dự án này trên Github"
 	},
+	"footer.nspm-github": {
+		"defaultMessage": "NSPM on GitHub"
+	},
+	"footer.upstream-npm": {
+		"defaultMessage": "Upstream NPM"
+	},
 	"host.flags.block-exploits": {
 		"defaultMessage": "Chặn các hoạt động khai thác phổ biến"
 	},
@@ -655,5 +661,17 @@
 	},
 	"users": {
 		"defaultMessage": "Danh sách người dùng"
+	},
+	"version.app": {
+		"defaultMessage": "NSPM v{version}"
+	},
+	"version.upstream": {
+		"defaultMessage": "Based on NPM v{version}"
+	},
+	"version.upstream-update": {
+		"defaultMessage": "Upstream NPM update: {version}"
+	},
+	"version.upstream-update-title": {
+		"defaultMessage": "New upstream NPM version {version} is available"
 	}
 }

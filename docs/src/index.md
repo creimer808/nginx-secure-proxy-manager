@@ -1,32 +1,33 @@
 ---
-# https://vitepress.dev/reference/default-theme-home-page
 layout: home
 
 hero:
-  name: "Nginx Proxy Manager"
-  tagline: Expose your services easily and securely
+  name: "Nginx Secure Proxy Manager"
+  tagline: Security-focused proxy management with upstream NPM compatibility
   image:
     src: /logo.svg
-    alt: NPM Logo
+    alt: Nginx Secure Proxy Manager shield
   actions:
     - theme: brand
       text: Get Started
       link: /guide/
     - theme: alt
       text: GitHub
-      link: https://github.com/NginxProxyManager/nginx-proxy-manager
+      link: https://github.com/creimer808/nginx-proxy-manager
 
 features:
-  - title: Get Connected
-    details: Expose web services on your network &middot; Free SSL with Let's Encrypt  &middot; Designed with security in mind  &middot; Perfect for home networks
-  - title: Proxy Hosts
-    details: Expose your private network Web services and get connected anywhere.
-  - title: Beautiful UI
-    details: Based on Tabler, the interface is a pleasure to use. Configuring a server has never been so fun.
+  - title: Security visibility
+    details: Review proxy traffic, status trends, and suspicious-source signals from the integrated dashboard.
+  - title: NPM-compatible core
+    details: Proxy hosts, redirects, streams, certificates, access lists, users, and audit logs are based on Nginx Proxy Manager.
+  - title: Dual versioning
+    details: NSPM releases are independently versioned and state the stable upstream NPM baseline they incorporate.
   - title: Free SSL
-    details: Built in Let’s Encrypt support allows you to secure your Web services at no cost to you. The certificates even renew themselves!
-  - title: Docker FTW
-    details: Built as a Docker Image, Nginx Proxy Manager only requires a database.
-  - title: Multiple Users
-    details: Configure other users to either view or manage their own hosts. Full access permissions are available.
+    details: Built-in Let's Encrypt support can secure web services and renew certificates.
+  - title: Docker deployment
+    details: Run the supported image from GitHub Container Registry with a persistent data volume.
+  - title: Independent maintenance
+    details: NSPM is maintained by CyberSec.Cam and creimer808 as an unofficial Nginx Proxy Manager fork.
 ---
+
+> **Unofficial fork:** Nginx Secure Proxy Manager is not affiliated with NGINX, Inc. or the official [Nginx Proxy Manager](https://github.com/NginxProxyManager/nginx-proxy-manager) project.

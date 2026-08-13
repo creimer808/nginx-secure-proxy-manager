@@ -2,116 +2,46 @@
 outline: deep
 ---
 
-# Guide
+# Nginx Secure Proxy Manager guide
 
-::: raw
-<p align="center">
-	<a href="https://hub.docker.com/repository/docker/jc21/nginx-proxy-manager" style="display:inline;margin-right:5px;">
-		<img src="https://img.shields.io/docker/stars/jc21/nginx-proxy-manager.svg?style=for-the-badge" style="display:inline;">
-	</a>
-	<a href="https://hub.docker.com/repository/docker/jc21/nginx-proxy-manager" style="display:inline;margin-right:5px;">
-		<img src="https://img.shields.io/docker/pulls/jc21/nginx-proxy-manager.svg?style=for-the-badge" style="display:inline;">
-	</a>
-</p>
-:::
+Nginx Secure Proxy Manager (NSPM) is a security-focused, unofficial fork of [Nginx Proxy Manager](https://github.com/NginxProxyManager/nginx-proxy-manager). It preserves the approachable proxy-management core and adds security and traffic visibility.
 
-This project comes as a pre-built docker image that enables you to easily forward to your websites
-running at home or otherwise, including free SSL, without having to know too much about Nginx or Letsencrypt.
+| Version | Current value |
+| --- | --- |
+| NSPM application | `0.1.0` |
+| Upstream NPM compatibility baseline | `2.15.1` |
 
-- [Quick Setup](#quick-setup)
-- [Full Setup](/setup/)
-- [Screenshots](/screenshots/)
-
-## Project Goal
-
-I created this project to fill a personal need to provide users with an easy way to accomplish reverse
-proxying hosts with SSL termination and it had to be so easy that a monkey could do it. This goal hasn't changed.
-While there might be advanced options they are optional and the project should be as simple as possible
-so that the barrier for entry here is low.
-
-::: raw
-<a href="https://www.buymeacoffee.com/jc21" target="_blank"><img src="http://public.jc21.com/github/by-me-a-coffee.png" alt="Buy Me A Coffee" style="height: 51px !important;width: 217px !important;" ></a>
-:::
+> NSPM is independently maintained by [CyberSec.Cam](https://www.cybersec.cam) / [creimer808](https://github.com/creimer808). It is not affiliated with or endorsed by NGINX, Inc. or the official Nginx Proxy Manager project.
 
 ## Features
 
-- Beautiful and Secure Admin Interface based on [Tabler](https://tabler.io/)
-- Easily create forwarding domains, redirections, streams and 404 hosts without knowing anything about Nginx
-- Free SSL using Let's Encrypt or provide your own custom SSL certificates
-- Access Lists and basic HTTP Authentication for your hosts
-- Advanced Nginx configuration available for super users
-- User management, permissions and audit log
+- Proxy hosts, redirects, streams, certificates, access lists, users, and audit logging inherited from Nginx Proxy Manager.
+- Security and traffic dashboard for reviewing local proxy activity.
+- Let's Encrypt and custom certificate support.
+- Advanced Nginx configuration for experienced operators.
 
+## Quick setup
 
-## Hosting your home network
-
-I won't go in to too much detail here but here are the basics for someone new to this self-hosted world.
-
-1. Your home router will have a Port Forwarding section somewhere. Log in and find it
-2. Add port forwarding for port 80 and 443 to the server hosting this project
-3. Configure your domain name details to point to your home, either with a static ip or a service like DuckDNS or [Amazon Route53](https://github.com/jc21/route53-ddns)
-4. Use the Nginx Proxy Manager as your gateway to forward to your other web based services
-
-## Quick Setup
-
-1. Install Docker and Docker-Compose
-
-- [Docker Install documentation](https://docs.docker.com/get-docker/)
-- [Docker-Compose Install documentation](https://docs.docker.com/compose/install/)
-
-2. Create a docker-compose.yml file similar to this:
-
-```yml
+```yaml
 services:
   app:
-    image: 'jc21/nginx-proxy-manager:{{VERSION}}'
+    image: ghcr.io/creimer808/nginx-proxy-manager:0.1.0
     restart: unless-stopped
-    environment:
-      TZ: "Australia/Brisbane"
     ports:
-      - '80:80'
-      - '81:81'
-      - '443:443'
+      - "80:80"
+      - "81:81"
+      - "443:443"
     volumes:
       - ./data:/data
       - ./letsencrypt:/etc/letsencrypt
 ```
 
-This is the bare minimum configuration required. See the [documentation](https://nginxproxymanager.com/setup/) for more.
+Start with `docker compose up -d`, then open [http://127.0.0.1:81](http://127.0.0.1:81) to complete setup. Pin an NSPM version tag rather than using `latest` in production.
 
-3. Bring up your stack by running
+## Upstream relationship
 
-```bash
-docker compose up -d
-```
+NSPM follows stable upstream releases, not `develop`. An upstream update notice is a compatibility signal rather than an automatic NSPM upgrade. See [UPSTREAM.md](https://github.com/creimer808/nginx-proxy-manager/blob/custom/UPSTREAM.md) for the synchronization process.
 
-4. Log in to the Admin UI
+## Support
 
-When your docker container is running, connect to it on port `81` for the admin interface.
-
-[http://127.0.0.1:81](http://127.0.0.1:81)
-
-This startup can take a minute depending on your hardware.
-
-
-## Contributing
-
-All are welcome to create pull requests for this project, against the `develop` branch. Official releases are created from the `master` branch.
-
-CI is used in this project. All PR's must pass before being considered. After passing,
-docker builds for PR's are available on dockerhub for manual verifications.
-
-Documentation within the `develop` branch is available for preview at
-[https://develop.nginxproxymanager.com](https://develop.nginxproxymanager.com)
-
-
-### Contributors
-
-Special thanks to [all of our contributors](https://github.com/NginxProxyManager/nginx-proxy-manager/graphs/contributors).
-
-
-## Getting Support
-
-1. [Found a bug?](https://github.com/NginxProxyManager/nginx-proxy-manager/issues)
-2. [Discussions](https://github.com/NginxProxyManager/nginx-proxy-manager/discussions)
-3. [Reddit](https://reddit.com/r/nginxproxymanager)
+Report NSPM issues at [github.com/creimer808/nginx-proxy-manager/issues](https://github.com/creimer808/nginx-proxy-manager/issues), including both versions shown in the UI. If a problem reproduces on an unmodified upstream Nginx Proxy Manager image, report it to the upstream project.

@@ -2,7 +2,7 @@ import express from "express";
 import { isCI } from "../lib/config.js";
 import errs from "../lib/error.js";
 import logRequest from "../lib/express/log-request.js";
-import pjson from "../package.json" with { type: "json" };
+import { versionResponse } from "../lib/version.js";
 import { isSetup } from "../setup.js";
 import auditLogRoutes from "./audit-log.js";
 import ciRoutes from "./ci.js";
@@ -32,17 +32,12 @@ router.use(logRequest);
  * GET /api
  */
 router.get("/", async (_, res /*, next*/) => {
-	const version = pjson.version.split("-").shift().split(".");
 	const setup = await isSetup();
 
 	res.status(200).send({
 		status: "OK",
 		setup,
-		version: {
-			major: Number.parseInt(version.shift(), 10),
-			minor: Number.parseInt(version.shift(), 10),
-			revision: Number.parseInt(version.shift(), 10),
-		},
+		...versionResponse(),
 	});
 });
 

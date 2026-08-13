@@ -1,3 +1,11 @@
-.logo {
-	width: 200px;
+.brand {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	font-size: 1.25rem;
+	font-weight: 600;
+}
+
+.brand img {
+	flex: none;
 }

@@ -4,6 +4,11 @@ export interface AppVersion {
 	revision: number;
 }
 
+export interface ApplicationVersions {
+	appVersion: string;
+	upstreamVersion: string;
+}
+
 export interface UserPermissions {
 	id?: number;
 	createdOn?: string;

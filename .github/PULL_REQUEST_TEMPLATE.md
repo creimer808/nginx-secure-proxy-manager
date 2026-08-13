@@ -2,6 +2,10 @@
 
 <!-- ANOTHER WARNING: Don't go creating a duplicate PR! Check that someone hasn't already created something that tackles your fix and if so, help them first -->
 
+## Fork and upstream impact
+
+<!-- If this changes inherited Nginx Proxy Manager behavior, describe the compatibility impact and whether upstream should receive a corresponding fix. -->
+
 ## Why
 
 <!-- Provide a brief description of WHY you are making your changes -->

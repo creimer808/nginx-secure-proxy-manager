@@ -1,7 +1,8 @@
-import type { AppVersion, User } from "./models";
+import type { AppVersion, ApplicationVersions, User } from "./models";
 
-export interface HealthResponse {
+export interface HealthResponse extends ApplicationVersions {
 	status: string;
+	// Legacy Nginx Proxy Manager compatibility version object.
 	version: AppVersion;
 	setup: boolean;
 }

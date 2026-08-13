@@ -359,6 +359,12 @@
 	"footer.github-fork": {
 		"defaultMessage": "Fork в GitHub"
 	},
+	"footer.nspm-github": {
+		"defaultMessage": "NSPM on GitHub"
+	},
+	"footer.upstream-npm": {
+		"defaultMessage": "Upstream NPM"
+	},
 	"host.flags.block-exploits": {
 		"defaultMessage": "Блокиране на често срещани експлойти"
 	},
@@ -691,5 +697,17 @@
 	},
 	"users": {
 		"defaultMessage": "Потребители"
+	},
+	"version.app": {
+		"defaultMessage": "NSPM v{version}"
+	},
+	"version.upstream": {
+		"defaultMessage": "Based on NPM v{version}"
+	},
+	"version.upstream-update": {
+		"defaultMessage": "Upstream NPM update: {version}"
+	},
+	"version.upstream-update-title": {
+		"defaultMessage": "New upstream NPM version {version} is available"
 	}
 }

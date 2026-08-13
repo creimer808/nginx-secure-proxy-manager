@@ -1,6 +1,6 @@
 import express from "express";
 import { debug, express as logger } from "../logger.js";
-import PACKAGE from "../package.json" with { type: "json" };
+import { resolveVersions } from "../lib/version.js";
 import { getCompiledSchema } from "../schema/index.js";
 
 const router = express.Router({
@@ -32,7 +32,7 @@ router
 				origin = req.headers.origin;
 			}
 
-			swaggerJSON.info.version = PACKAGE.version;
+			swaggerJSON.info.version = resolveVersions().app.normalized;
 			swaggerJSON.servers[0].url = `${origin}/api`;
 			res.status(200).send(swaggerJSON);
 		} catch (err) {

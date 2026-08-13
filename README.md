@@ -1,111 +1,71 @@
 <p align="center">
-	<img src="https://nginxproxymanager.com/github.png">
-	<br><br>
-	<img src="https://img.shields.io/badge/version-2.15.1-green.svg?style=for-the-badge">
-	<a href="https://hub.docker.com/repository/docker/jc21/nginx-proxy-manager">
-		<img src="https://img.shields.io/docker/stars/jc21/nginx-proxy-manager.svg?style=for-the-badge">
-	</a>
-	<a href="https://hub.docker.com/repository/docker/jc21/nginx-proxy-manager">
-		<img src="https://img.shields.io/docker/pulls/jc21/nginx-proxy-manager.svg?style=for-the-badge">
-	</a>
+  <img src="frontend/public/images/nspm-shield.svg" width="96" alt="Nginx Secure Proxy Manager shield">
 </p>
 
-This project comes as a pre-built Docker image that enables you to easily forward to your websites
-running at home or otherwise, including free SSL, without having to know too much about Nginx or Letsencrypt.
+# Nginx Secure Proxy Manager
 
-- [Quick Setup](#quick-setup)
-- [Full Setup](https://nginxproxymanager.com/setup/)
-- [Screenshots](https://nginxproxymanager.com/screenshots/)
+**Nginx Secure Proxy Manager (NSPM)** is a security-focused, unofficial fork of [Nginx Proxy Manager](https://github.com/NginxProxyManager/nginx-proxy-manager). It retains NPM's approachable reverse-proxy, certificate, access-list, and user-management experience while adding security visibility features, beginning with the security and traffic dashboard.
 
-## Project Goal
+> NSPM is independently maintained by [CyberSec.Cam](https://www.cybersec.cam) / [creimer808](https://github.com/creimer808). It is not affiliated with, endorsed by, or supported by NGINX, Inc. or the official Nginx Proxy Manager project.
 
-I created this project to fill a personal need to provide users with an easy way to accomplish reverse
-proxying hosts with SSL termination, and it had to be so easy that a monkey could do it. This goal hasn't changed.
-While there might be advanced options, they are optional, and the project should be as simple as possible
-so that the barrier to entry here is low.
+## Versions and compatibility
 
-<a href="https://www.buymeacoffee.com/jc21" target="_blank"><img src="http://public.jc21.com/github/by-me-a-coffee.png" alt="Buy Me A Coffee" style="height: 51px !important;width: 217px !important;" ></a>
+| Version | Value |
+| --- | --- |
+| NSPM application | `0.1.0` |
+| Nginx Proxy Manager compatibility baseline | `2.15.1` |
 
+NSPM releases use their own semantic version (`v0.1.0`). The upstream baseline is shown separately so users can determine which stable NPM release supplied the core behavior. See [UPSTREAM.md](UPSTREAM.md) for the synchronization policy.
 
 ## Features
 
-- Beautiful and Secure Admin Interface based on [Tabler](https://tabler.github.io/)
-- Easily create forwarding domains, redirections, streams, and 404 hosts without knowing anything about Nginx
-- Free SSL using Let's Encrypt or provide your own custom SSL certificates
-- Access Lists and basic HTTP Authentication for your hosts
-- Advanced Nginx configuration available for super users
-- User management, permissions, and audit log
+- NPM-compatible proxy hosts, redirections, streams, certificates, access lists, users, permissions, and audit log.
+- A security and traffic dashboard for recent request volume, status trends, and potentially suspicious sources.
+- Let's Encrypt certificates, custom certificates, and advanced Nginx configuration.
+- Multi-architecture container images for `amd64` and `arm64`.
 
-::: warning
-`armv7` is no longer supported in version 2.14+. This is due to Nodejs dropping support for armhf. Please
-use the `2.13.7` image tag if this applies to you.
-:::
+## Quick setup
 
-## Hosting your home network
+1. Install [Docker](https://docs.docker.com/get-docker/) and Docker Compose.
+2. Create `docker-compose.yml`:
 
-I won't go into too much detail here, but here are the basics for someone new to this self-hosted world.
-
-1. Your home router will have a Port Forwarding section somewhere. Log in and find it
-2. Add port forwarding for ports 80 and 443 to the server hosting this project
-3. Configure your domain name details to point to your home, either with a static ip or a service like
-   - DuckDNS
-   - [Amazon Route53](https://github.com/jc21/route53-ddns)
-   - [Cloudflare](https://github.com/jc21/cloudflare-ddns)
-4. Use the Nginx Proxy Manager as your gateway to forward to your other web-based services
-
-## Quick Setup
-
-1. [Install Docker](https://docs.docker.com/install/)
-2. Create a docker-compose.yml file similar to this:
-
-```yml
+```yaml
 services:
   app:
-    image: 'docker.io/jc21/nginx-proxy-manager:latest'
+    image: ghcr.io/creimer808/nginx-proxy-manager:0.1.0
     restart: unless-stopped
     ports:
-      - '80:80'
-      - '81:81'
-      - '443:443'
+      - "80:80"
+      - "81:81"
+      - "443:443"
     volumes:
       - ./data:/data
       - ./letsencrypt:/etc/letsencrypt
 ```
 
-This is the bare minimum configuration required. See the [documentation](https://nginxproxymanager.com/setup/) for more.
+3. Start it with `docker compose up -d`.
+4. Open [http://127.0.0.1:81](http://127.0.0.1:81) and complete initial setup.
 
-3. Bring up your stack by running
+Pin an NSPM image digest in production. A numbered tag identifies a release but can only be relied on as immutable when GitHub release-tag protection and GHCR tag immutability are enforced; `latest` is intentionally mutable.
 
-```bash
-docker compose up -d
-```
+## Security dashboard
 
-4. Log in to the Admin UI
+The dashboard is designed to make proxy activity easier to review without replacing a SIEM, IDS, or log-retention program. It summarizes access-log data locally and applies bounded retention. Validate decisions against your authoritative logs and monitoring systems before taking action.
 
-When your docker container is running, connect to it on port `81` for the admin interface.
-Sometimes this can take a little bit because of the entropy of keys.
+## Upstream relationship and attribution
 
-[http://127.0.0.1:81](http://127.0.0.1:81)
+This project is built on the work of [Jamie Curnow](https://github.com/jc21), the [Nginx Proxy Manager contributors](https://github.com/NginxProxyManager/nginx-proxy-manager/graphs/contributors), and the wider open-source community. The core feature set remains based on Nginx Proxy Manager. NSPM preserves the upstream MIT license and its notices; CyberSec.Cam's fork-specific changes are also MIT licensed.
 
+- Upstream project: <https://github.com/NginxProxyManager/nginx-proxy-manager>
+- NSPM repository: <https://github.com/creimer808/nginx-proxy-manager>
+- CyberSec.Cam: <https://www.cybersec.cam>
 
-## Contributing
+## Support and contributions
 
-All are welcome to create pull requests for this project, against the `develop` branch. Official releases are created from the `master` branch.
+Please open NSPM bugs and feature requests in this repository, including **both** the NSPM and upstream compatibility versions displayed in the UI. For behavior that reproduces on an unmodified upstream image, report it upstream instead.
 
-CI is used in this project. All PR's must pass before being considered. After passing,
-docker builds for PR's are available on dockerhub for manual verifications.
+See [SECURITY.md](SECURITY.md) for responsible vulnerability reporting and [UPSTREAM.md](UPSTREAM.md) for the stable-release synchronization workflow.
 
-Documentation within the `develop` branch is available for preview at
-[https://develop.nginxproxymanager.com](https://develop.nginxproxymanager.com)
+## Roadmap
 
-
-### Contributors
-
-Special thanks to [all of our contributors](https://github.com/NginxProxyManager/nginx-proxy-manager/graphs/contributors).
-
-
-## Getting Support
-
-1. [Found a bug?](https://github.com/NginxProxyManager/nginx-proxy-manager/issues)
-2. [Discussions](https://github.com/NginxProxyManager/nginx-proxy-manager/discussions)
-3. [Reddit](https://reddit.com/r/nginxproxymanager)
+Planned fork-specific work includes richer security telemetry, dashboard improvements, and operational security features. These are roadmap items, not guarantees; compatibility and secure maintenance take priority.

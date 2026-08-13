@@ -1,8 +1,8 @@
 {
-	"name": "nginx-proxy-manager",
-	"version": "2.0.0",
-	"description": "A beautiful interface for creating Nginx endpoints",
-	"author": "Jamie Curnow <jc@jc21.com>",
+	"name": "@cybersec-cam/nginx-secure-proxy-manager",
+	"version": "0.1.0",
+	"description": "Nginx Secure Proxy Manager, a security-focused fork of Nginx Proxy Manager",
+	"author": "CyberSec.Cam (https://www.cybersec.cam)",
 	"license": "MIT",
 	"main": "index.js",
 	"type": "module",
@@ -49,5 +49,17 @@
 	"signale": {
 		"displayDate": true,
 		"displayTimestamp": true
-	}
+	},
+	"homepage": "https://www.cybersec.cam",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/creimer808/nginx-proxy-manager.git"
+	},
+	"bugs": {
+		"url": "https://github.com/creimer808/nginx-proxy-manager/issues"
+	},
+	"upstreamVersion": "2.15.1",
+	"contributors": [
+		"creimer808 (https://github.com/creimer808)"
+	]
 }

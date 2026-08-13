@@ -5,7 +5,7 @@ import errs from "../lib/error.js";
 import authModel from "../models/auth.js";
 import internalUser from "./user.js";
 
-const APP_NAME = "Nginx Proxy Manager";
+const APP_NAME = "Nginx Secure Proxy Manager";
 const BACKUP_CODE_COUNT = 8;
 
 /**
@@ -161,12 +161,12 @@ const internal2fa = {
 		}
 
 		const result = await verify({
-            token: code,
-            secret: auth.meta.totp_secret,
-            guardrails: createGuardrails({
-                MIN_SECRET_BYTES: 10,
-            }),
-        });
+			token: code,
+			secret: auth.meta.totp_secret,
+			guardrails: createGuardrails({
+				MIN_SECRET_BYTES: 10,
+			}),
+		});
 
 		if (!result.valid) {
 			throw new errs.AuthError("Invalid verification code");
@@ -288,11 +288,7 @@ const internal2fa = {
 	},
 
 	getUserPasswordAuth: async (userId) => {
-		const auth = await authModel
-			.query()
-			.where("user_id", userId)
-			.andWhere("type", "password")
-			.first();
+		const auth = await authModel.query().where("user_id", userId).andWhere("type", "password").first();
 
 		if (!auth) {
 			throw new errs.ItemNotFoundError("Auth not found");
