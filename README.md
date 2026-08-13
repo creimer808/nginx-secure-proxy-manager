@@ -32,7 +32,7 @@ NSPM releases use their own semantic version (`v0.1.0`). The upstream baseline i
 ```yaml
 services:
   app:
-    image: ghcr.io/creimer808/nginx-proxy-manager:0.1.0
+    image: ghcr.io/creimer808/nginx-secure-proxy-manager:0.1.0
     restart: unless-stopped
     ports:
       - "80:80"
@@ -52,12 +52,16 @@ Pin an NSPM image digest in production. A numbered tag identifies a release but 
 
 The dashboard is designed to make proxy activity easier to review without replacing a SIEM, IDS, or log-retention program. It summarizes access-log data locally and applies bounded retention. Validate decisions against your authoritative logs and monitoring systems before taking action.
 
+<p align="center">
+  <img src="readme-security-dashboard.png" alt="NSPM security and traffic dashboard showing request totals, bandwidth, HTTP status trends, security posture, top proxy hosts, and observed client errors">
+</p>
+
 ## Upstream relationship and attribution
 
 This project is built on the work of [Jamie Curnow](https://github.com/jc21), the [Nginx Proxy Manager contributors](https://github.com/NginxProxyManager/nginx-proxy-manager/graphs/contributors), and the wider open-source community. The core feature set remains based on Nginx Proxy Manager. NSPM preserves the upstream MIT license and its notices; CyberSec.Cam's fork-specific changes are also MIT licensed.
 
 - Upstream project: <https://github.com/NginxProxyManager/nginx-proxy-manager>
-- NSPM repository: <https://github.com/creimer808/nginx-proxy-manager>
+- NSPM repository: <https://github.com/creimer808/nginx-secure-proxy-manager>
 - CyberSec.Cam: <https://www.cybersec.cam>
 
 ## Support and contributions
