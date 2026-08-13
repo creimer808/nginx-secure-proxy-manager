@@ -2,7 +2,7 @@
 	"openapi": "3.1.0",
 	"info": {
 		"title": "Nginx Secure Proxy Manager API",
-		"version": "0.1.1",
+		"version": "0.1.2",
 		"description": "API documentation for Nginx Secure Proxy Manager (NSPM), an unofficial fork based on Nginx Proxy Manager.\n\nMost endpoints require authentication via Bearer Token (JWT). You can generate a token by logging in via the `POST /tokens` endpoint.\n\nFor more information, visit [CyberSec.Cam](https://www.cybersec.cam)."
 	},
 	"servers": [
@@ -51,6 +51,10 @@
 		{
 			"name": "reports",
 			"description": "Endpoints for viewing reports"
+		},
+		{
+			"name": "security",
+			"description": "Investigation endpoints for authorized security events and retained logs"
 		},
 		{
 			"name": "settings",
@@ -276,6 +280,28 @@
 			"get": {
 				"$ref": "./paths/schema/get.json"
 			}
+		},
+		"/security/overview": {
+			"get": { "$ref": "./paths/security/overview-get.json" }
+		},
+		"/security/events": {
+			"get": { "$ref": "./paths/security/get.json" }
+		},
+		"/security/events/{event_id}": {
+			"get": { "$ref": "./paths/security/events-id-get.json" }
+		},
+		"/security/rules": {
+			"get": { "$ref": "./paths/security/rules-get.json" }
+		},
+		"/security/log-files": {
+			"get": { "$ref": "./paths/security/log-files-get.json" }
+		},
+		"/security/logs": {
+			"get": { "$ref": "./paths/security/logs-get.json" }
+		},
+		"/security/settings": {
+			"get": { "$ref": "./paths/security/settings-get.json" },
+			"put": { "$ref": "./paths/security/settings-put.json" }
 		},
 		"/settings": {
 			"get": {

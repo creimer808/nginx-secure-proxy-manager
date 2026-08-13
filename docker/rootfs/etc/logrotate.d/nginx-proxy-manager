@@ -26,3 +26,21 @@
     kill -USR1 `cat /run/nginx/nginx.pid 2>/dev/null` 2>/dev/null || true
     endscript
 }
+
+# Security records may contain full query strings. Keep them separate from the
+# broadly readable access logs and rotate by both age and size.
+/data/logs/proxy-host-*_security.log {
+    su npm npm
+    create 0640 npm npm
+    daily
+    maxsize 50M
+    rotate 30
+    missingok
+    notifempty
+    compress
+    delaycompress
+    sharedscripts
+    postrotate
+    kill -USR1 `cat /run/nginx/nginx.pid 2>/dev/null` 2>/dev/null || true
+    endscript
+}

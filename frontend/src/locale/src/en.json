@@ -350,6 +350,9 @@
 	"dashboard.metrics.no-visible-hosts": {
 		"defaultMessage": "No proxy hosts are visible to this account."
 	},
+	"dashboard.metrics.open-security": {
+		"defaultMessage": "Open Security investigation"
+	},
 	"dashboard.metrics.requests": {
 		"defaultMessage": "Requests"
 	},
@@ -775,6 +778,258 @@
 	},
 	"save": {
 		"defaultMessage": "Save"
+	},
+	"security.admin-only": {
+		"defaultMessage": "Security configuration is available to administrators only."
+	},
+	"security.all": {
+		"defaultMessage": "All"
+	},
+	"security.collector-available": {
+		"defaultMessage": "Available"
+	},
+	"security.collector-disabled": {
+		"defaultMessage": "Disabled"
+	},
+	"security.collector-health": {
+		"defaultMessage": "Collector health"
+	},
+	"security.collector-unavailable": {
+		"defaultMessage": "Unavailable"
+	},
+	"security.configuration": {
+		"defaultMessage": "Configuration"
+	},
+	"security.copied": {
+		"defaultMessage": "Log line copied."
+	},
+	"security.copy-failed": {
+		"defaultMessage": "Could not copy the log line."
+	},
+	"security.description": {
+		"defaultMessage": "Investigate locally collected Nginx security telemetry. Rule matches and HTTP errors are evidence to review, not proof of compromise."
+	},
+	"security.detail-unavailable": {
+		"defaultMessage": "Full event details could not be loaded."
+	},
+	"security.duration": {
+		"defaultMessage": "Duration"
+	},
+	"security.empty": {
+		"defaultMessage": "No security records match the selected filters."
+	},
+	"security.error": {
+		"defaultMessage": "Could not load security information."
+	},
+	"security.event-details": {
+		"defaultMessage": "Event details"
+	},
+	"security.event-id": {
+		"defaultMessage": "Event ID"
+	},
+	"security.events": {
+		"defaultMessage": "Events"
+	},
+	"security.from": {
+		"defaultMessage": "From"
+	},
+	"security.host": {
+		"defaultMessage": "Proxy host"
+	},
+	"security.ingested-at": {
+		"defaultMessage": "Ingested at"
+	},
+	"security.log-error": {
+		"defaultMessage": "Could not read the requested log."
+	},
+	"security.log-inventory-error": {
+		"defaultMessage": "Could not load the log inventory."
+	},
+	"security.log-kind": {
+		"defaultMessage": "Log kind"
+	},
+	"security.log-target": {
+		"defaultMessage": "Log target"
+	},
+	"security.metadata-search": {
+		"defaultMessage": "Search URI, user agent, or referrer"
+	},
+	"security.method": {
+		"defaultMessage": "Method"
+	},
+	"security.next-page": {
+		"defaultMessage": "Next page"
+	},
+	"security.nginx-errors": {
+		"defaultMessage": "Nginx warnings and errors"
+	},
+	"security.nginx-level": {
+		"defaultMessage": "Nginx level"
+	},
+	"security.nginx-message": {
+		"defaultMessage": "Nginx message"
+	},
+	"security.overview": {
+		"defaultMessage": "Overview"
+	},
+	"security.partial-results": {
+		"defaultMessage": "Results are partial because the bounded scan limit was reached."
+	},
+	"security.peer-ip": {
+		"defaultMessage": "Immediate peer IP"
+	},
+	"security.peer-port": {
+		"defaultMessage": "Immediate peer port"
+	},
+	"security.previous-page": {
+		"defaultMessage": "Previous page"
+	},
+	"security.protocol": {
+		"defaultMessage": "HTTP protocol"
+	},
+	"security.query-warning": {
+		"defaultMessage": "Metadata search is kept out of the URL because query strings can contain tokens or credentials."
+	},
+	"security.raw-log-notice": {
+		"defaultMessage": "Raw logs are read-only and may contain sensitive query strings. Search text is not saved in the URL."
+	},
+	"security.raw-logs": {
+		"defaultMessage": "Raw Logs"
+	},
+	"security.referrer": {
+		"defaultMessage": "Referrer"
+	},
+	"security.remote-user": {
+		"defaultMessage": "Remote user"
+	},
+	"security.request-bytes": {
+		"defaultMessage": "Request bytes"
+	},
+	"security.request-id": {
+		"defaultMessage": "Request ID"
+	},
+	"security.response-bytes": {
+		"defaultMessage": "Response bytes"
+	},
+	"security.retention-days": {
+		"defaultMessage": "Detailed event retention (days)"
+	},
+	"security.retention-detail": {
+		"defaultMessage": "Choose an integer from 7 through 365. Lowering this value removes expired indexed events during the next collection cycle."
+	},
+	"security.retention-warning": {
+		"defaultMessage": "Full query strings can contain tokens or credentials. Database retention does not remove raw log rotations, backups, or snapshots."
+	},
+	"security.rotation": {
+		"defaultMessage": "Rotation"
+	},
+	"security.rule": {
+		"defaultMessage": "Rule"
+	},
+	"security.rule-action": {
+		"defaultMessage": "Rule action"
+	},
+	"security.rule-category": {
+		"defaultMessage": "Rule category"
+	},
+	"security.rule-matches": {
+		"defaultMessage": "Matched built-in exploit rules"
+	},
+	"security.ruleset-version": {
+		"defaultMessage": "Ruleset version"
+	},
+	"security.saved": {
+		"defaultMessage": "Security settings saved."
+	},
+	"security.schema-version": {
+		"defaultMessage": "Schema version"
+	},
+	"security.scheme": {
+		"defaultMessage": "Scheme"
+	},
+	"security.search-logs": {
+		"defaultMessage": "Search log text"
+	},
+	"security.select-host": {
+		"defaultMessage": "Select a proxy host to browse its logs."
+	},
+	"security.severity": {
+		"defaultMessage": "Severity"
+	},
+	"security.source-ip": {
+		"defaultMessage": "Source IP"
+	},
+	"security.status": {
+		"defaultMessage": "Status"
+	},
+	"security.status-401": {
+		"defaultMessage": "401 observations"
+	},
+	"security.status-403": {
+		"defaultMessage": "403 observations"
+	},
+	"security.status-404": {
+		"defaultMessage": "404 observations"
+	},
+	"security.status-429": {
+		"defaultMessage": "429 observations"
+	},
+	"security.status-5xx": {
+		"defaultMessage": "5xx observations"
+	},
+	"security.time": {
+		"defaultMessage": "Time"
+	},
+	"security.timeline": {
+		"defaultMessage": "Event timeline"
+	},
+	"security.title": {
+		"defaultMessage": "Security"
+	},
+	"security.tls-cipher": {
+		"defaultMessage": "TLS cipher"
+	},
+	"security.tls-protocol": {
+		"defaultMessage": "TLS protocol"
+	},
+	"security.to": {
+		"defaultMessage": "To"
+	},
+	"security.top-hosts": {
+		"defaultMessage": "Top proxy hosts"
+	},
+	"security.top-methods": {
+		"defaultMessage": "Top methods"
+	},
+	"security.top-rules": {
+		"defaultMessage": "Top rules"
+	},
+	"security.top-sources": {
+		"defaultMessage": "Top source IPs"
+	},
+	"security.top-statuses": {
+		"defaultMessage": "Top statuses"
+	},
+	"security.total-events": {
+		"defaultMessage": "Total events"
+	},
+	"security.type": {
+		"defaultMessage": "Event type"
+	},
+	"security.upstream-address": {
+		"defaultMessage": "Upstream address"
+	},
+	"security.upstream-duration": {
+		"defaultMessage": "Upstream duration"
+	},
+	"security.upstream-status": {
+		"defaultMessage": "Upstream status"
+	},
+	"security.uri": {
+		"defaultMessage": "URI"
+	},
+	"security.user-agent": {
+		"defaultMessage": "User agent"
 	},
 	"setting": {
 		"defaultMessage": "Setting"

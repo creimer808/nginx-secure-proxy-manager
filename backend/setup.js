@@ -1,8 +1,10 @@
 import { installPlugins } from "./lib/certbot.js";
 import utils from "./lib/utils.js";
 import { setup as logger } from "./logger.js";
+import internalNginx from "./internal/nginx.js";
 import authModel from "./models/auth.js";
 import certificateModel from "./models/certificate.js";
+import proxyHostModel from "./models/proxy_host.js";
 import settingModel from "./models/setting.js";
 import userModel from "./models/user.js";
 import userPermissionModel from "./models/user_permission.js";
@@ -95,6 +97,18 @@ const setupDefaultSettings = async () => {
 			});
 		logger.info("Default settings added");
 	}
+
+	const securityRetention = await settingModel.query().select("id").where({ id: "security-event-retention-days" }).first();
+	if (!securityRetention?.id) {
+		await settingModel.query().insert({
+			id: "security-event-retention-days",
+			name: "Security Event Retention Days",
+			description: "Detailed security event retention period (7 through 365 days)",
+			value: "30",
+			meta: {},
+		});
+		logger.info("Security event retention setting added");
+	}
 };
 
 /**
@@ -142,11 +156,12 @@ const setupCertbotPlugins = async () => {
 };
 
 /**
- * Starts a timer to call run the logrotation binary every two days
+ * Starts a timer to run logrotate every 15 minutes. Security logs also rotate
+ * by size, so the burst bound is meaningful without creating a busy loop.
  * @returns {Promise}
  */
 const setupLogrotation = () => {
-	const intervalTimeout = 1000 * 60 * 60 * 24 * 2; // 2 days
+	const intervalTimeout = 1000 * 60 * 15; // every 15 minutes
 
 	const runLogrotate = async () => {
 		try {
@@ -163,4 +178,28 @@ const setupLogrotation = () => {
 	return runLogrotate();
 };
 
-export default () => setupDefaultUser().then(setupDefaultSettings).then(setupCertbotPlugins).then(setupLogrotation);
+/**
+ * Regenerate only proxy-host files created before security logging existed.
+ * The Nginx service stages every replacement, validates the candidate, and
+ * restores the last known working files if validation or reload fails.
+ */
+const upgradeSecurityProxyHostConfigs = async () => {
+	const hosts = await proxyHostModel
+		.query()
+		.where("is_deleted", 0)
+		.andWhere("enabled", 1)
+		.allowGraph(proxyHostModel.defaultAllowGraph)
+		.withGraphFetched(`[${proxyHostModel.defaultExpand.join(", ")}]`);
+
+	try {
+		await internalNginx.upgradeProxyHostConfigs(hosts);
+	} catch (err) {
+		logger.error(`Security proxy-host configuration upgrade failed; existing configs were restored: ${err.message}`);
+	}
+};
+
+export default () => setupDefaultUser()
+	.then(setupDefaultSettings)
+	.then(setupCertbotPlugins)
+	.then(upgradeSecurityProxyHostConfigs)
+	.then(setupLogrotation);

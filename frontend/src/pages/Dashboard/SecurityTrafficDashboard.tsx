@@ -97,6 +97,7 @@ const SecurityTrafficDashboard = () => {
 					<h3 id="security-traffic-heading" className="mb-0">
 						<T id="dashboard.metrics.title" />
 					</h3>
+					<a href="/security" className="small"><T id="dashboard.metrics.open-security" /></a>
 				</div>
 				<div className={styles.headerActions}>
 					{isFetching && !isLoading && (

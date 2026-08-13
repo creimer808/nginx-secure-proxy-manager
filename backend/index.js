@@ -4,6 +4,7 @@ import app from "./app.js";
 import internalCertificate from "./internal/certificate.js";
 import internalIpRanges from "./internal/ip_ranges.js";
 import internalTrafficMetrics from "./internal/traffic-metrics.js";
+import internalSecurityEvents from "./internal/security-events.js";
 import { global as logger } from "./logger.js";
 import { migrateUp } from "./migrate.js";
 import { getCompiledSchema } from "./schema/index.js";
@@ -29,6 +30,9 @@ async function appStart() {
 			internalCertificate.initTimer();
 			internalIpRanges.initTimer();
 			internalTrafficMetrics.initTimer();
+			// The collector is best-effort and handles its own failures so event
+			// ingestion can never prevent the management API from starting.
+			internalSecurityEvents.initTimer();
 
 			const server = app.listen(3000, () => {
 				logger.info(`Backend PID ${process.pid} listening on port 3000 ...`);

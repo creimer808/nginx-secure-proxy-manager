@@ -17,7 +17,7 @@
 		"app_version": {
 			"type": "string",
 			"description": "Nginx Secure Proxy Manager application version",
-			"example": "0.1.1"
+			"example": "0.1.2"
 		},
 		"upstream_version": {
 			"type": "string",

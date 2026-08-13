@@ -1,0 +1,7 @@
+{
+  "headers": {
+    "Cache-Control": { "schema": { "type": "string", "example": "private, no-store" } },
+    "X-Content-Type-Options": { "schema": { "type": "string", "example": "nosniff" } },
+    "Referrer-Policy": { "schema": { "type": "string", "example": "no-referrer" } }
+  }
+}

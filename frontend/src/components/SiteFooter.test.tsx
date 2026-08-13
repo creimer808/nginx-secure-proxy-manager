@@ -18,14 +18,14 @@ describe("SiteFooter version identity", () => {
 	afterEach(() => cleanup());
 
 	it("links both release versions and labels an upstream update", () => {
-		useHealth.mockReturnValue({ data: { appVersion: "0.1.1", upstreamVersion: "2.15.1" } });
+		useHealth.mockReturnValue({ data: { appVersion: "0.1.2", upstreamVersion: "2.15.1" } });
 		useCheckVersion.mockReturnValue({ data: { updateAvailable: true, latest: "v2.16.0" } });
 
 		render(<SiteFooter />);
 
-		expect(screen.getByRole("link", { name: "version.app:0.1.1" })).toHaveAttribute(
+		expect(screen.getByRole("link", { name: "version.app:0.1.2" })).toHaveAttribute(
 			"href",
-			"https://github.com/creimer808/nginx-proxy-manager/releases/tag/v0.1.1",
+			"https://github.com/creimer808/nginx-proxy-manager/releases/tag/v0.1.2",
 		);
 		expect(screen.getByRole("link", { name: "version.upstream:2.15.1" })).toHaveAttribute(
 			"href",

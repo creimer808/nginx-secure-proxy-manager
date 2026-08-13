@@ -2,7 +2,7 @@ import fs from "node:fs";
 import NodeRSA from "node-rsa";
 import { global as logger } from "../logger.js";
 
-const keysFile               = '/data/keys.json';
+const getKeysFile = () => process.env.NODE_ENV === "test" && process.env.NSPM_KEYS_FILE ? process.env.NSPM_KEYS_FILE : "/data/keys.json";
 const mysqlEngine            = 'mysql2';
 const postgresEngine         = 'pg';
 const sqliteClientName       = 'better-sqlite3';
@@ -106,6 +106,7 @@ const configure = () => {
 
 const getKeys = () => {
 	// Get keys from file
+	const keysFile = getKeysFile();
 	if (isDebugMode()) {
 		logger.debug("Checking for keys file:", keysFile);
 	}
@@ -125,6 +126,7 @@ const getKeys = () => {
 };
 
 const generateKeys = () => {
+	const keysFile = getKeysFile();
 	logger.info("Creating a new JWT key pair...");
 	// Now create the keys and save them in the config.
 	const key = new NodeRSA({ b: 2048 });

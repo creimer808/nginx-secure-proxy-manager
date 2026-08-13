@@ -11,7 +11,7 @@ Create a `docker-compose.yml` file:
 ```yml
 services:
   app:
-    image: 'ghcr.io/creimer808/nginx-proxy-manager:0.1.1'
+    image: 'ghcr.io/creimer808/nginx-proxy-manager:0.1.2'
     restart: unless-stopped
 
     ports:
@@ -55,7 +55,7 @@ Here is an example of what your `docker-compose.yml` will look like when using a
 ```yml
 services:
   app:
-    image: 'ghcr.io/creimer808/nginx-proxy-manager:0.1.1'
+    image: 'ghcr.io/creimer808/nginx-proxy-manager:0.1.2'
     restart: unless-stopped
     ports:
       # These ports are in format <host-port>:<container-port>
@@ -118,7 +118,7 @@ Similar to the MySQL server setup:
 ```yml
 services:
   app:
-    image: 'ghcr.io/creimer808/nginx-proxy-manager:0.1.1'
+    image: 'ghcr.io/creimer808/nginx-proxy-manager:0.1.2'
     restart: unless-stopped
     ports:
       # These ports are in format <host-port>:<container-port>

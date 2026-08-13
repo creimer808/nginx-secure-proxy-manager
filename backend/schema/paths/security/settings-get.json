@@ -1,0 +1,1 @@
+{"operationId":"securitySettings","summary":"Get security retention configuration","tags":["security"],"security":[{"bearerAuth":[]}],"responses":{"200":{"description":"Security settings","headers":{"$ref":"./common.json#/headers"}},"403":{"description":"Administrator permission required"}}}

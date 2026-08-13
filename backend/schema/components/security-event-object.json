@@ -1,0 +1,16 @@
+{
+	"type": "object",
+	"description": "Security event. Request metadata is unredacted and responses are private/no-store.",
+	"required": ["event_id", "occurred_at_ms", "event_type", "severity"],
+	"properties": {
+		"event_id": { "type": "string" },
+		"occurred_at_ms": { "type": "integer" },
+		"proxy_host_id": { "type": ["integer", "null"] },
+		"event_type": { "type": "string", "enum": ["exploit_rule", "http_status", "nginx_error"] },
+		"severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+		"rule_id": { "type": ["string", "null"] },
+		"client_ip": { "type": ["string", "null"] },
+		"request_uri": { "type": ["string", "null"] },
+		"status": { "type": ["integer", "null"] }
+	}
+}

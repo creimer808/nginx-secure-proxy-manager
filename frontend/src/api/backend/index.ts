@@ -62,3 +62,4 @@ export * from "./updateUser";
 export * from "./uploadCertificate";
 export * from "./validateCertificate";
 export * from "./twoFactor";
+export * from "./security";

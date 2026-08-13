@@ -1,0 +1,1 @@
+{"operationId":"securityRules","summary":"List active built-in security rules","tags":["security"],"security":[{"bearerAuth":[]}],"parameters":[{"name":"range","in":"query","required":true,"schema":{"type":"string","enum":["24h","7d","30d"]}}],"responses":{"200":{"description":"Rule catalog","headers":{"$ref":"./common.json#/headers"}},"400":{"description":"Invalid range"}}}

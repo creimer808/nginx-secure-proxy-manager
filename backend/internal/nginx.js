@@ -5,6 +5,7 @@ import _ from "lodash";
 import errs from "../lib/error.js";
 import utils from "../lib/utils.js";
 import { debug, nginx as logger } from "../logger.js";
+import { ensureSecurityLogFile } from "../lib/security-log-file.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -181,84 +182,164 @@ const internalNginx = {
 	},
 
 	/**
+	 * Render a host configuration without changing the active configuration.
+	 * This is used by startup upgrades so validation can happen before a working
+	 * file is replaced.
+	 *
+	 * @param {String} host_type
+	 * @param {Object} host_row
+	 * @returns {Promise<string>}
+	 */
+	renderConfig: async (host_type, host_row) => {
+		const host = JSON.parse(JSON.stringify(host_row));
+		const niceHostType = internalNginx.getFileFriendlyHostType(host_type);
+		let template;
+		try {
+			template = fs.readFileSync(`${__dirname}/../templates/${niceHostType}.conf`, { encoding: "utf8" });
+		} catch (err) {
+			throw new errs.ConfigurationError(err.message);
+		}
+
+		if (niceHostType !== "default") {
+			host.use_default_location = true;
+			if (host.advanced_config) {
+				host.use_default_location = !internalNginx.advancedConfigHasDefaultLocation(host.advanced_config);
+			}
+		}
+		if (niceHostType === "redirection_host" && ['http', 'https'].indexOf(host.forward_scheme.toLowerCase()) === -1) {
+			host.forward_scheme = "$scheme";
+		}
+		if (host.locations) {
+			const originalLocations = [].concat(host.locations);
+			host.locations = await internalNginx.renderLocations(host);
+			if (originalLocations.some((location) => location.path === "/")) {
+				host.use_default_location = false;
+			}
+		}
+		host.ipv6 = internalNginx.ipv6Enabled();
+		return utils.getRenderEngine().parseAndRender(template, host);
+	},
+
+	/**
 	 * @param   {String}  host_type
 	 * @param   {Object}  host
 	 * @returns {Promise}
 	 */
-	generateConfig: (host_type, host_row) => {
-		// Prevent modifying the original object:
-		const host = JSON.parse(JSON.stringify(host_row));
-		const nice_host_type = internalNginx.getFileFriendlyHostType(host_type);
+	generateConfig: async (host_type, host) => {
+		const niceHostType = internalNginx.getFileFriendlyHostType(host_type);
+		if (niceHostType === "proxy_host") {
+			ensureSecurityLogFile(Number(host.id));
+		}
+		const filename = internalNginx.getConfigName(niceHostType, host.id);
+		const configText = await internalNginx.renderConfig(host_type, host);
+		fs.writeFileSync(filename, configText, { encoding: "utf8" });
+		debug(logger, "Wrote config:", filename, configText);
+		return true;
+	},
 
-		debug(logger, `Generating ${nice_host_type} Config:`, JSON.stringify(host, null, 2));
+	/**
+	 * Replace older proxy-host config files only after all replacements have
+	 * been rendered, security logs prepared, and Nginx accepts the candidate.
+	 * On any failure every original file is restored before the caller continues.
+	 *
+	 * @param {Object[]} hosts
+	 * @returns {Promise<boolean>} true when an upgrade was applied
+	 */
+	upgradeProxyHostConfigs: async (hosts) => {
+		// Recover an interrupted prior upgrade before making new decisions. Without
+		// a durable commit marker, a retained backup is authoritative: restore it
+		// and retry the validated upgrade from the beginning.
+		for (const host of hosts) {
+			const filename = internalNginx.getConfigName("proxy_host", host.id);
+			const backupFilename = `${filename}.security-backup`;
+			const stagedFilename = `${filename}.security-upgrade`;
+			if (fs.existsSync(backupFilename)) {
+				if (fs.existsSync(filename)) fs.unlinkSync(filename);
+				fs.renameSync(backupFilename, filename);
+				logger.warn(`Recovered interrupted security upgrade for proxy host ${host.id}`);
+			}
+			fs.rmSync(stagedFilename, { force: true });
+			ensureSecurityLogFile(Number(host.id));
+		}
 
-		const renderEngine = utils.getRenderEngine();
-
-		return new Promise((resolve, reject) => {
-			let template = null;
-			const filename = internalNginx.getConfigName(nice_host_type, host.id);
-
+		const upgradeHosts = hosts.filter((host) => {
+			const filename = internalNginx.getConfigName("proxy_host", host.id);
 			try {
-				template = fs.readFileSync(`${__dirname}/../templates/${nice_host_type}.conf`, { encoding: "utf8" });
-			} catch (err) {
-				reject(new errs.ConfigurationError(err.message));
-				return;
+				return !fs.readFileSync(filename, "utf8").includes("_security.log security_json");
+			} catch {
+				return true;
+			}
+		});
+		if (upgradeHosts.length === 0) {
+			return false;
+		}
+
+		const staged = [];
+		const backups = [];
+		let committed = false;
+		try {
+			for (const host of upgradeHosts) {
+				const filename = internalNginx.getConfigName("proxy_host", host.id);
+				const stagedFilename = `${filename}.security-upgrade`;
+				fs.writeFileSync(stagedFilename, await internalNginx.renderConfig("proxy_host", host), { encoding: "utf8", mode: 0o640 });
+				staged.push({ filename, stagedFilename });
 			}
 
-			let locationsPromise;
-			let origLocations;
-
-			// Manipulate the data a bit before sending it to the template
-			if (nice_host_type !== "default") {
-				host.use_default_location = true;
-				if (typeof host.advanced_config !== "undefined" && host.advanced_config) {
-					host.use_default_location = !internalNginx.advancedConfigHasDefaultLocation(host.advanced_config);
+			for (const item of staged) {
+				const backupFilename = `${item.filename}.security-backup`;
+				if (fs.existsSync(backupFilename)) {
+					throw new Error(`Refusing to overwrite existing security upgrade backup: ${backupFilename}`);
+				}
+				const backup = { ...item, backupFilename, existed: fs.existsSync(item.filename) };
+				if (backup.existed) {
+					fs.renameSync(item.filename, backupFilename);
+				}
+				backups.push(backup);
+				fs.renameSync(item.stagedFilename, item.filename);
+			}
+			await internalNginx.test();
+			await internalNginx.reload();
+			// A successful reload is the commit point. Backup cleanup failures must
+			// never enter the destructive rollback path and remove active hosts.
+			committed = true;
+			for (const backup of backups) {
+				if (backup.existed) {
+					try {
+						fs.unlinkSync(backup.backupFilename);
+					} catch (cleanupErr) {
+						logger.warn(`Could not remove committed proxy host backup ${backup.backupFilename}: ${cleanupErr.message}`);
+					}
 				}
 			}
-
-			// For redirection hosts, if the scheme is not http or https, set it to $scheme
-			if (nice_host_type === "redirection_host" && ['http', 'https'].indexOf(host.forward_scheme.toLowerCase()) === -1) {
-				host.forward_scheme = "$scheme";
+			logger.info(`Upgraded ${upgradeHosts.length} proxy host config(s) for security logging`);
+			return true;
+		} catch (err) {
+			if (committed) {
+				throw err;
 			}
-
-			if (host.locations) {
-				//logger.info ('host.locations = ' + JSON.stringify(host.locations, null, 2));
-				origLocations = [].concat(host.locations);
-				locationsPromise = internalNginx.renderLocations(host).then((renderedLocations) => {
-					host.locations = renderedLocations;
-				});
-
-				// Allow someone who is using / custom location path to use it, and skip the default / location
-				_.map(host.locations, (location) => {
-					if (location.path === "/") {
-						host.use_default_location = false;
+			for (const backup of backups.reverse()) {
+				try {
+					if (fs.existsSync(backup.filename)) {
+						fs.unlinkSync(backup.filename);
 					}
-				});
-			} else {
-				locationsPromise = Promise.resolve();
+					if (backup.existed && fs.existsSync(backup.backupFilename)) {
+						fs.renameSync(backup.backupFilename, backup.filename);
+					}
+				} catch (restoreErr) {
+					logger.error(`Could not restore proxy host config ${backup.filename}: ${restoreErr.message}`);
+				}
 			}
-
-			// Set the IPv6 setting for the host
-			host.ipv6 = internalNginx.ipv6Enabled();
-
-			locationsPromise.then(() => {
-				renderEngine
-					.parseAndRender(template, host)
-					.then((config_text) => {
-						fs.writeFileSync(filename, config_text, { encoding: "utf8" });
-						debug(logger, "Wrote config:", filename, config_text);
-
-						// Restore locations array
-						host.locations = origLocations;
-
-						resolve(true);
-					})
-					.catch((err) => {
-						debug(logger, `Could not write ${filename}:`, err.message);
-						reject(new errs.ConfigurationError(err.message));
-					});
-			});
-		});
+			for (const item of staged) {
+				fs.rmSync(item.stagedFilename, { force: true });
+			}
+			try {
+				await internalNginx.test();
+				await internalNginx.reload();
+			} catch (restoreErr) {
+				logger.error(`Restored Nginx configuration could not be reloaded: ${restoreErr.message}`);
+			}
+			throw err;
+		}
 	},
 
 	/**

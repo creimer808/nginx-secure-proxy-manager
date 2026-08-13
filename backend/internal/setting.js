@@ -16,12 +16,15 @@ const internalSetting = {
 			.then((/*access_data*/) => {
 				return internalSetting.get(access, { id: data.id });
 			})
-			.then((row) => {
+				.then((row) => {
 				if (row.id !== data.id) {
 					// Sanity check that something crazy hasn't happened
 					throw new errs.InternalValidationError(
 						`Setting could not be updated, IDs do not match: ${row.id} !== ${data.id}`,
 					);
+				}
+				if (row.id === "security-event-retention-days" && !/^(?:[7-9]|[1-9]\d|[1-2]\d\d|3[0-5]\d|36[0-5])$/.test(String(data.value))) {
+					throw new errs.ValidationError("Security event retention must be an integer from 7 through 365 days.");
 				}
 
 				return settingModel.query().where({ id: data.id }).patch(data);

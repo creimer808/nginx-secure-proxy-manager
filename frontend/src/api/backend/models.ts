@@ -213,3 +213,123 @@ export interface DNSProvider {
 	name: string;
 	credentials: string;
 }
+
+export type SecurityRange = "24h" | "7d" | "30d";
+export type SecurityEventType = "exploit_rule" | "http_status" | "nginx_error";
+export type SecuritySeverity = "low" | "medium" | "high" | "critical";
+export type SecurityLogKind = "access" | "error" | "security";
+export type SecurityLogTarget = "host" | "global";
+
+export interface SecurityCollectorHealth {
+	enabled?: boolean;
+	available?: boolean;
+	lagMs?: number | null;
+	lastStartedOn?: string | null;
+	lastCompletedOn?: string | null;
+	lastErrorOn?: string | null;
+	lastErrorSummary?: string | null;
+	bytesRead?: number;
+	linesRead?: number;
+	eventsInserted?: number;
+	estimatedDatabaseBytes?: number;
+	malformedLines?: number;
+	filesPending?: number;
+	limitReached?: boolean;
+	databaseHighWaterReached?: boolean;
+	rawLogDiskHighWaterReached?: boolean;
+}
+
+export interface SecurityCountItem {
+	count: number;
+	ruleId?: string;
+	clientIp?: string;
+	proxyHostId?: number;
+	status?: number;
+	method?: string;
+}
+
+export interface SecurityTimelineItem {
+	bucketStart: number;
+	eventType: SecurityEventType;
+	severity: SecuritySeverity;
+	count: number;
+}
+
+export interface SecurityOverview {
+	range: SecurityRange;
+	totalEvents: number;
+	exploitRuleMatches: number;
+	nginxErrors: number;
+	statuses: { "401": number; "403": number; "404": number; "429": number; "5xx": number };
+	timeline: SecurityTimelineItem[];
+	topRules: SecurityCountItem[];
+	topSources: SecurityCountItem[];
+	topHosts: SecurityCountItem[];
+	topStatuses: SecurityCountItem[];
+	topMethods: SecurityCountItem[];
+	collector: SecurityCollectorHealth;
+}
+
+export interface SecurityEvent {
+	id: number;
+	eventId: string | null;
+	occurredAtMs: number;
+	createdOn?: string;
+	proxyHostId: number | null;
+	hostDomainSnapshot: string | null;
+	ownerUserIdSnapshot?: number | null;
+	sourceKind: string;
+	schemaVersion?: string | null;
+	rulesetVersion?: string | null;
+	requestId?: string | null;
+	eventType: SecurityEventType;
+	severity: SecuritySeverity;
+	ruleId: string | null;
+	ruleCategory?: string | null;
+	ruleAction?: string | null;
+	clientIp: string | null;
+	peerIp?: string | null;
+	peerPort?: number | null;
+	method: string | null;
+	scheme?: string | null;
+	requestHost?: string | null;
+	requestUri: string | null;
+	httpProtocol?: string | null;
+	status: number | null;
+	upstreamStatus?: string | null;
+	requestBytes?: number | null;
+	responseBytes?: number | null;
+	requestTimeMs: number | null;
+	upstreamAddr?: string | null;
+	upstreamTimeMs?: number | null;
+	tlsProtocol?: string | null;
+	tlsCipher?: string | null;
+	remoteUser?: string | null;
+	userAgent?: string | null;
+	referrer?: string | null;
+	nginxErrorLevel?: string | null;
+	nginxErrorMessage?: string | null;
+}
+
+export interface SecurityEventPage { items: SecurityEvent[]; nextCursor: string | null; }
+export interface SecurityRule { id: string; category: string; description: string; action: string; rulesetVersion: string; count: number; }
+export interface SecurityLogFile { rotation: string; compressed: boolean; available: boolean; }
+export interface SecurityLogLine { offset: number; line: string; }
+export interface SecurityLogPage { lines: SecurityLogLine[]; partial: boolean; scanLimitBytes: number; nextCursor: string | null; previousCursor: string | null; }
+export interface SecuritySettings { retentionDays: number; }
+
+export interface SecurityEventFilters {
+	from?: string;
+	to?: string;
+	proxyHostId?: number;
+	eventType?: SecurityEventType;
+	severity?: SecuritySeverity;
+	ruleId?: string;
+	clientIp?: string;
+	status?: number;
+	statusClass?: "5xx";
+	method?: string;
+	query?: string;
+	limit?: number;
+	cursor?: string;
+}
