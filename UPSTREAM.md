@@ -6,7 +6,7 @@ Nginx Secure Proxy Manager (NSPM) is an unofficial fork of [Nginx Proxy Manager]
 
 Each NSPM release has two independent versions:
 
-- **NSPM application version**: the fork's semantic release, for example `0.1.0`.
+- **NSPM application version**: the fork's semantic release, for example `0.1.1`.
 - **Upstream compatibility baseline**: the stable Nginx Proxy Manager release incorporated by that fork release, for example `2.15.1`.
 
 The sources are deliberately separate:
@@ -15,7 +15,7 @@ The sources are deliberately separate:
 - `.version` is the upstream compatibility baseline.
 - `backend/package.json` and `frontend/package.json` mirror both values for runtime metadata.
 
-Do not use an upstream `v2.x` tag as an NSPM release tag. NSPM releases use tags such as `v0.1.0`.
+Do not use an upstream `v2.x` tag as an NSPM release tag. NSPM releases use tags such as `v0.1.1`.
 
 ## Sync procedure
 
