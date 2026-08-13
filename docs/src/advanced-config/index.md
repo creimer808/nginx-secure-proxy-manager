@@ -14,7 +14,7 @@ on the `data` and `letsencrypt` folders at startup.
 ```yml
 services:
   app:
-    image: 'ghcr.io/creimer808/nginx-proxy-manager:0.1.0'
+    image: 'ghcr.io/creimer808/nginx-proxy-manager:0.1.1'
     environment:
       PUID: 1000
       PGID: 1000
@@ -101,7 +101,7 @@ secrets:
 
 services:
   app:
-    image: 'ghcr.io/creimer808/nginx-proxy-manager:0.1.0'
+    image: 'ghcr.io/creimer808/nginx-proxy-manager:0.1.1'
     restart: unless-stopped
     ports:
       # Public HTTP Port:

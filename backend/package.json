@@ -1,6 +1,6 @@
 {
 	"name": "@cybersec-cam/nginx-secure-proxy-manager",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Nginx Secure Proxy Manager, a security-focused fork of Nginx Proxy Manager",
 	"author": "CyberSec.Cam (https://www.cybersec.cam)",
 	"license": "MIT",
