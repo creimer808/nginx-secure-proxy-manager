@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DashboardReport } from "src/api/backend";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the API layer so the component can be tested in isolation.
 vi.mock("src/api/backend", async () => {
@@ -42,7 +42,7 @@ const sampleReport = (): DashboardReport => ({
 	},
 	series: [
 		{
-			bucketStart: 1786544000,
+			bucketStart: 1786546800,
 			requestCount: 1200,
 			status1xx: 0,
 			status2xx: 1100,
@@ -148,12 +148,20 @@ describe("SecurityTrafficDashboard", () => {
 		});
 	});
 
-	it("switches the range and refetches with the new range", async () => {
-		mockedGetDashboardReport.mockResolvedValue(sampleReport());
+	it("switches the range without relabeling retained data", async () => {
+		let resolveSevenDay: ((report: DashboardReport) => void) | undefined;
+		mockedGetDashboardReport.mockImplementation((range) => {
+			if (range === "24h") {
+				return Promise.resolve(sampleReport());
+			}
+			return new Promise((resolve) => {
+				resolveSevenDay = resolve;
+			});
+		});
 		renderWithClient();
 
 		await waitFor(() => {
-			expect(screen.getAllByText("185,430").length).toBeGreaterThan(0);
+			expect(screen.getByRole("img", { name: "Historical trend" })).toHaveAttribute("data-range", "24h");
 		});
 
 		const sevenDayButton = screen.getByText("7 days").closest("button");
@@ -163,6 +171,23 @@ describe("SecurityTrafficDashboard", () => {
 		await waitFor(() => {
 			expect(mockedGetDashboardReport).toHaveBeenLastCalledWith("7d", expect.anything());
 		});
+		expect(screen.getByRole("img", { name: "Historical trend" })).toHaveAttribute("data-range", "24h");
+
+		const sevenDayReport = sampleReport();
+		sevenDayReport.range = "7d";
+		sevenDayReport.series = [
+			{
+				...sevenDayReport.series[0],
+				bucketStart: 1786492800,
+				requestCount: 321,
+			},
+		];
+		resolveSevenDay?.(sevenDayReport);
+		await waitFor(() => {
+			expect(screen.getByRole("img", { name: "Historical trend" })).toHaveAttribute("data-range", "7d");
+		});
+		expect(screen.getByText("321")).toBeInTheDocument();
+		expect(screen.getAllByText("Aug 12").length).toBeGreaterThan(0);
 	});
 
 	it("shows the no-traffic empty state", async () => {
@@ -186,6 +211,36 @@ describe("SecurityTrafficDashboard", () => {
 			expect(screen.getByText(/No traffic has been collected yet/i)).toBeInTheDocument();
 			expect(screen.getByText("0 B")).toBeInTheDocument();
 		});
+	});
+
+	it("distinguishes no visible hosts from an empty traffic range", async () => {
+		const report = sampleReport();
+		report.posture.enabled = 0;
+		report.posture.disabled = 0;
+		report.traffic.requests = 0;
+		report.series = [];
+		mockedGetDashboardReport.mockResolvedValue(report);
+		renderWithClient();
+
+		await waitFor(() => {
+			expect(screen.getByText("No proxy hosts are visible to this account.")).toBeInTheDocument();
+		});
+		expect(screen.queryByText(/No traffic has been collected yet/i)).not.toBeInTheDocument();
+	});
+
+	it("keeps cached metrics visible when a background refresh fails", async () => {
+		mockedGetDashboardReport.mockResolvedValueOnce(sampleReport()).mockRejectedValueOnce(new Error("boom"));
+		const { queryClient } = renderWithClient();
+
+		await waitFor(() => {
+			expect(screen.getAllByText("185,430").length).toBeGreaterThan(0);
+		});
+		await queryClient.refetchQueries({ queryKey: ["dashboard-report", "24h"] });
+
+		await waitFor(() => {
+			expect(screen.getByText("Could not load security & traffic metrics.")).toBeInTheDocument();
+		});
+		expect(screen.getAllByText("185,430").length).toBeGreaterThan(0);
 	});
 
 	it("shows the disabled note when collection is disabled", async () => {

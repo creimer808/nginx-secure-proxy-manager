@@ -128,7 +128,7 @@ const Dashboard = () => {
 
 				{/* Security & Traffic panel. Host-count cards above stay usable if this report fails. */}
 				<HasPermission section={PROXY_HOSTS} permission={VIEW} hideError>
-					<div className="col-12 mt-4">
+					<div className="col-12">
 						<SecurityTrafficDashboard />
 					</div>
 				</HasPermission>

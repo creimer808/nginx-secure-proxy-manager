@@ -347,6 +347,9 @@
 	"dashboard.metrics.no-data": {
 		"defaultMessage": "No data for the selected range."
 	},
+	"dashboard.metrics.no-visible-hosts": {
+		"defaultMessage": "No proxy hosts are visible to this account."
+	},
 	"dashboard.metrics.requests": {
 		"defaultMessage": "Requests"
 	},
