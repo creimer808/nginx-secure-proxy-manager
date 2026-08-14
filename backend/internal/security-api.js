@@ -13,6 +13,9 @@ const RAW_LINE_LIMIT = 500;
 const RAW_SCAN_BYTES = 2 * 1024 * 1024;
 const RAW_COMPRESSED_INPUT_BYTES = 64 * 1024 * 1024;
 const RAW_SCAN_RUNTIME_MS = 3000;
+// Matches the collector. A ratio tuned for untrusted uploads truncates ordinary
+// Nginx archives, which compress far past 25:1 when a scanner repeats one path.
+const RAW_GZIP_EXPANSION_RATIO = 500;
 const MAX_CONCURRENT_SCANS = 2;
 const MAX_SCANS_PER_USER = 1;
 const SCAN_WINDOW_MS = 60_000;
@@ -37,6 +40,9 @@ const globalFiles = {
 		"fallback_http_error.log",
 		...Array.from({ length: 10 }, (_, index) => `fallback_http_error.log.${index + 1}.gz`),
 	],
+	// Traffic that never reached a proxy host. Reachable only through the global
+	// target, which parseTarget already restricts to administrators.
+	security: ["fallback_security.log", "fallback_security.log.1", ...Array.from({ length: 29 }, (_, index) => `fallback_security.log.${index + 2}.gz`)],
 };
 
 const isAdmin = (data) => Array.isArray(data.roles) && data.roles.includes("admin");
@@ -204,7 +210,6 @@ const listLogFiles = async (access, input) => {
 	if (!logKinds.has(input.kind)) throw new errs.ValidationError("Invalid log kind");
 	const actor = await securityAccess(access, "security:logs-list");
 	const target = await parseTarget(actor, input);
-	if (target.target === "global" && input.kind === "security") throw new errs.ValidationError("Invalid log kind");
 	return filesForTarget(target.target, target.hostId, input.kind).map((name, index) => ({ rotation: index === 0 ? "current" : name.slice(name.indexOf(".log") + 4), compressed: name.endsWith(".gz"), available: Boolean(safeLogFile(name)) })).filter((file) => file.available);
 };
 const acquireScan = (userId) => {
@@ -225,7 +230,6 @@ const readLog = async (access, input, aborted = () => false) => {
 	if (!logKinds.has(input.kind)) throw new errs.ValidationError("Invalid log kind");
 	const actor = await securityAccess(access, "security:logs-read");
 	const target = await parseTarget(actor, input);
-	if (target.target === "global" && input.kind === "security") throw new errs.ValidationError("Invalid log kind");
 	const rotation = input.rotation === undefined ? "current" : String(input.rotation);
 	const names = filesForTarget(target.target, target.hostId, input.kind);
 	const name = rotation === "current" ? names[0] : names.find((candidate) => candidate.slice(candidate.indexOf(".log") + 4) === rotation);
@@ -246,7 +250,7 @@ const readLog = async (access, input, aborted = () => false) => {
 			// stream. Start gzip browsing at logical offset zero unless a caller has a
 			// previously returned logical cursor; the response remains explicitly partial.
 			const start = cursor ? cursor.o : direction === "backward" && !name.endsWith(".gz") ? Math.max(0, opened.stat.size - RAW_SCAN_BYTES) : 0;
-			const result = await readSecurityLog(opened, { compressed: name.endsWith(".gz"), byteOffset: start, maxBytes: RAW_SCAN_BYTES, maxLineLength: 256 * 1024, maxCompressedBytes: RAW_COMPRESSED_INPUT_BYTES, maxOutputBytes: RAW_SCAN_BYTES, maxExpansionRatio: 25, maxRuntimeMs: RAW_SCAN_RUNTIME_MS, aborted });
+			const result = await readSecurityLog(opened, { compressed: name.endsWith(".gz"), byteOffset: start, maxBytes: RAW_SCAN_BYTES, maxLineLength: 256 * 1024, maxCompressedBytes: RAW_COMPRESSED_INPUT_BYTES, maxOutputBytes: RAW_SCAN_BYTES, maxExpansionRatio: RAW_GZIP_EXPANSION_RATIO, maxRuntimeMs: RAW_SCAN_RUNTIME_MS, aborted });
 			const matches = result.lines.filter((item) => !item.oversized && (!query || item.line.includes(query)));
 			const selected = direction === "backward" ? matches.slice(-limit).reverse() : matches.slice(0, limit);
 			// Continue from the last fully accepted record, never from scannedOffset:
@@ -270,7 +274,22 @@ const readLog = async (access, input, aborted = () => false) => {
 		} finally { fs.closeSync(opened.fd); }
 	} finally { release(); }
 };
-const getRetention = async (access) => { await securityAccess(access, "security:settings-update"); const row = await databaseFactory()("setting").where("id", "security-event-retention-days").first(); return { retention_days: Number(row?.value || 30) }; };
+/**
+ * Retention plus the outcome of the startup proxy-host configuration upgrade.
+ * Without the latter an operator has no way to see that Nginx never received
+ * the security logging directive other than by reading container logs.
+ */
+const getRetention = async (access) => {
+	const actor = await securityAccess(access, "security:settings-update");
+	const row = await databaseFactory()("setting").where("id", "security-event-retention-days").first();
+	const settings = { retention_days: Number(row?.value || 30) };
+	if (!actor.admin) return settings;
+	const state = await databaseFactory()("security_config_state").first();
+	settings.nginx_upgrade = state
+		? { last_run_on: state.last_run_on, hosts_total: Number(state.hosts_total), hosts_upgraded: Number(state.hosts_upgraded), hosts_skipped: Number(state.hosts_skipped), hosts_pending: Number(state.hosts_pending), reload_deferred: Boolean(state.reload_deferred), last_error_summary: state.last_error_summary || null }
+		: null;
+	return settings;
+};
 const updateRetention = async (access, value) => {
 	const actor = await securityAccess(access, "security:settings-update");
 	if (!actor.admin) throw new errs.PermissionError();

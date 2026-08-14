@@ -806,6 +806,9 @@
 	"security.copy-failed": {
 		"defaultMessage": "Could not copy the log line."
 	},
+	"security.count": {
+		"defaultMessage": "Count"
+	},
 	"security.description": {
 		"defaultMessage": "Investigate locally collected Nginx security telemetry. Rule matches and HTTP errors are evidence to review, not proof of compromise."
 	},
@@ -835,6 +838,15 @@
 	},
 	"security.host": {
 		"defaultMessage": "Proxy host"
+	},
+	"security.hosts-pending": {
+		"defaultMessage": "Proxy hosts not attempted"
+	},
+	"security.hosts-skipped": {
+		"defaultMessage": "Proxy hosts skipped"
+	},
+	"security.hosts-upgraded": {
+		"defaultMessage": "Proxy hosts with security logging"
 	},
 	"security.ingested-at": {
 		"defaultMessage": "Ingested at"
@@ -869,6 +881,18 @@
 	"security.nginx-message": {
 		"defaultMessage": "Nginx message"
 	},
+	"security.nginx-upgrade": {
+		"defaultMessage": "Nginx configuration"
+	},
+	"security.nginx-upgrade-active": {
+		"defaultMessage": "Security logging is active on every enabled proxy host."
+	},
+	"security.nginx-upgrade-incomplete": {
+		"defaultMessage": "Security logging is not active on every enabled proxy host. Events from the affected hosts will be missing."
+	},
+	"security.nginx-upgrade-unknown": {
+		"defaultMessage": "The startup configuration check has not recorded a result yet."
+	},
 	"security.overview": {
 		"defaultMessage": "Overview"
 	},
@@ -898,6 +922,9 @@
 	},
 	"security.referrer": {
 		"defaultMessage": "Referrer"
+	},
+	"security.reload-deferred": {
+		"defaultMessage": "Nginx has not been reloaded yet; the upgraded configuration applies when it next starts."
 	},
 	"security.remote-user": {
 		"defaultMessage": "Remote user"

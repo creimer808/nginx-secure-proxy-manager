@@ -17,6 +17,10 @@
     su npm npm
     create 0644
     weekly
+    # A flapping upstream can produce hundreds of megabytes between weekly
+    # rotations. Bound it by size as well so the collector never has to identify
+    # an unbounded file.
+    maxsize 50M
     rotate 10
     missingok
     notifempty
@@ -29,7 +33,7 @@
 
 # Security records may contain full query strings. Keep them separate from the
 # broadly readable access logs and rotate by both age and size.
-/data/logs/proxy-host-*_security.log {
+/data/logs/*_security.log {
     su npm npm
     create 0640 npm npm
     daily

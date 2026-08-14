@@ -8,7 +8,14 @@ const RETENTION_BATCH_SIZE = 500;
 const writeSecurityEvents = async (trx, { events, cursors, state, retentionDays, nowMs = Date.now() }) => {
 	let inserted = 0;
 	for (const event of events) {
-		const before = await trx("security_event").where("event_id", event.event_id).first("id");
+		// The schema carries two unique keys. A truncate-and-regrow of the same
+		// inode reuses a segment's line offsets with new content, which produces a
+		// fresh event_id but a duplicate (segment, offset) pair; preflighting only
+		// event_id would let that roll back the whole batch and strand the cursors.
+		const before = await trx("security_event")
+			.where("event_id", event.event_id)
+			.orWhere((builder) => builder.where("ingest_segment_id", event.ingest_segment_id).andWhere("ingest_line_offset", event.ingest_line_offset))
+			.first("id");
 		if (before) continue;
 		await trx("security_event").insert({ ...event, created_on: new Date(nowMs) });
 		inserted += 1;
@@ -20,6 +27,7 @@ const writeSecurityEvents = async (trx, { events, cursors, state, retentionDays,
 			file_path: cursor.file_path,
 			byte_offset: cursor.byte_offset,
 			content_fingerprint: cursor.content_fingerprint,
+			fingerprint_size: cursor.fingerprint_size ?? 0,
 			updated_on: new Date(nowMs),
 		};
 		const existing = await trx("security_log_cursor")

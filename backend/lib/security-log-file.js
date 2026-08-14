@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { resolve } from "node:path";
 
-const DEFAULT_LOG_DIR = "/data/logs";
+const DEFAULT_LOG_DIR = process.env.SECURITY_LOG_DIR || "/data/logs";
 const SECURITY_LOG_MODE = 0o640;
 
 const getSecurityLogPath = (proxyHostId, logDir = DEFAULT_LOG_DIR) => {

@@ -37,5 +37,11 @@ mkdir -p \
 
 touch /var/log/nginx/error.log || true
 chmod 777 /var/log/nginx/error.log || true
+
+# The fallback security log holds full query strings for traffic that never
+# reached a proxy host. Create it with the same restrictive mode the per-host
+# security logs use, before Nginx can create it under its own umask.
+touch /data/logs/fallback_security.log || true
+chmod 640 /data/logs/fallback_security.log || true
 chmod -R 777 /var/cache/nginx || true
 chmod 644 /etc/logrotate.d/nginx-proxy-manager

@@ -6,9 +6,11 @@ import { after, before, describe, it } from "node:test";
 import knex from "knex";
 import errs from "../lib/error.js";
 import { up as securityMigrationUp, down as securityMigrationDown } from "../migrations/20260813120000_security_events.js";
+import { up as progressMigrationUp, down as progressMigrationDown } from "../migrations/20260814120000_security_telemetry_progress.js";
 let configureSecurityApiForTesting;
 let getEvent;
 let listEvents;
+let getRetention;
 let listLogFiles;
 let readLog;
 let resetSecurityApiTestState;
@@ -51,7 +53,7 @@ before(async () => {
 	process.env.NODE_ENV = "test";
 	process.env.NODE_CONFIG_DIR = configDirectory;
 	process.env.NSPM_KEYS_FILE = path.join(configDirectory, "keys.json");
-	({ configureSecurityApiForTesting, getEvent, listEvents, listLogFiles, readLog, resetSecurityApiTestState, updateRetention } = await import("./security-api.js"));
+	({ configureSecurityApiForTesting, getEvent, getRetention, listEvents, listLogFiles, readLog, resetSecurityApiTestState, updateRetention } = await import("./security-api.js"));
 	logDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "security-api-"));
 	database = knex({ client: "better-sqlite3", connection: { filename: ":memory:" }, useNullAsDefault: true });
 	await database.schema.createTable("proxy_host", (table) => {
@@ -64,11 +66,13 @@ before(async () => {
 		table.increments("id"); table.integer("user_id").notNullable(); table.string("action").notNullable(); table.string("object_type").notNullable(); table.integer("object_id").notNullable(); table.json("meta").notNullable(); table.dateTime("created_on").notNullable(); table.dateTime("modified_on").notNullable();
 	});
 	await securityMigrationUp(database);
+	await progressMigrationUp(database);
 	configureSecurityApiForTesting({ database, logDirectory });
 });
 
 after(async () => {
 	resetSecurityApiTestState();
+	await progressMigrationDown(database);
 	await securityMigrationDown(database);
 	await database.destroy();
 	fs.rmSync(logDirectory, { recursive: true, force: true });
@@ -119,6 +123,22 @@ describe("security API database-backed authorization and raw-log boundaries", ()
 		assert.ok(page.next_cursor);
 		const next = await readLog(owner, { proxy_host_id: "9", kind: "security", direction: "forward", cursor: page.next_cursor, limit: "1" });
 		assert.equal(next.lines[0].line, "two");
+	});
+
+	it("exposes the fallback security log and the configuration upgrade status to administrators only", async () => {
+		fs.writeFileSync(path.join(logDirectory, "fallback_security.log"), "fallback line\n");
+		const admin = access({ userId: 1, admin: true });
+		assert.deepEqual(await listLogFiles(admin, { target: "global", kind: "security" }), [{ rotation: "current", compressed: false, available: true }]);
+		assert.equal((await readLog(admin, { target: "global", kind: "security" })).lines[0].line, "fallback line");
+		await assert.rejects(() => listLogFiles(access({ userId: 10 }), { target: "global", kind: "security" }), { status: 403 });
+		await assert.rejects(() => readLog(access({ userId: 10 }), { target: "global", kind: "security" }), { status: 403 });
+
+		await database("security_config_state").insert({ last_run_on: new Date(), hosts_total: 3, hosts_upgraded: 2, hosts_skipped: 1, hosts_pending: 0, reload_deferred: true, last_error_summary: "proxy host 7: missing certificate" });
+		const settings = await getRetention(admin);
+		assert.equal(settings.nginx_upgrade.hosts_upgraded, 2);
+		assert.equal(settings.nginx_upgrade.hosts_skipped, 1);
+		assert.equal(settings.nginx_upgrade.reload_deferred, true);
+		assert.equal((await getRetention(access({ userId: 10 }))).nginx_upgrade, undefined);
 	});
 
 	it("makes retention updates administrator-only and rolls back the setting if its audit write fails", async () => {

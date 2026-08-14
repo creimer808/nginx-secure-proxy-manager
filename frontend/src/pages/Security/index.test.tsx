@@ -5,7 +5,8 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { hasPermission, PROXY_HOSTS, VIEW } from "src/modules/Permissions";
 
-const hooks = vi.hoisted(() => ({ roles: ["admin"], permission: "view" }));
+const upgraded = { lastRunOn: null, hostsTotal: 3, hostsUpgraded: 3, hostsSkipped: 0, hostsPending: 0, reloadDeferred: false, lastErrorSummary: null };
+const hooks = vi.hoisted(() => ({ roles: ["admin"], permission: "view", nginxUpgrade: null as null | Record<string, unknown> }));
 vi.mock("src/hooks", () => ({
 	useUser: () => ({ data: { roles: hooks.roles, permissions: { proxyHosts: hooks.permission } }, isLoading: false }),
 	useProxyHosts: () => ({ data: [{ id: 7, domainNames: ["example.test"] }] }),
@@ -14,15 +15,26 @@ vi.mock("src/hooks", () => ({
 	useSecurityEvent: () => ({ data: undefined, isLoading: false, isError: false }),
 	useSecurityLogFiles: () => ({ data: [{ rotation: "current", available: true, compressed: false }] }),
 	useSecurityLogs: () => ({ data: { lines: [{ offset: 0, line: "long request token=secret" }], partial: true, nextCursor: "next", previousCursor: null, scanLimitBytes: 1 }, isLoading: false, isError: false }),
-	useSecuritySettings: () => ({ data: { retentionDays: 30 } }),
+	useSecuritySettings: () => ({ data: { retentionDays: 30, nginxUpgrade: hooks.nginxUpgrade } }),
 }));
 vi.mock("src/api/backend", async (original) => ({ ...(await original<typeof import("src/api/backend")>()), updateSecuritySettings: vi.fn() }));
 const Security = (await import("./index")).default;
 const renderPage = (entry = "/security") => render(<QueryClientProvider client={new QueryClient()}><MemoryRouter initialEntries={[entry]}><Security /></MemoryRouter></QueryClientProvider>);
 
 describe("Security page", () => {
-	afterEach(() => { cleanup(); hooks.roles = ["admin"]; hooks.permission = "view"; });
+	afterEach(() => { cleanup(); hooks.roles = ["admin"]; hooks.permission = "view"; hooks.nginxUpgrade = null; });
 	it("denies page navigation when proxy host view permission is hidden", () => { expect(hasPermission(PROXY_HOSTS, VIEW, { visibility: "user", proxyHosts: "hidden", redirectionHosts: "hidden", deadHosts: "hidden", streams: "hidden", accessLists: "hidden", certificates: "hidden" }, ["user"])).toBe(false); });
 	it("keeps metadata search out of structural URL filters and renders details as text", () => { renderPage("/security?tab=events&status=403"); fireEvent.change(screen.getByLabelText("Search URI, user agent, or referrer"), { target: { value: "token=secret" } }); expect(window.location.search).not.toContain("token"); fireEvent.click(screen.getByLabelText("View details for /a?token=secret")); expect(screen.getAllByText("/a?token=secret").length).toBeGreaterThan(1); });
 	it("shows raw-log selection guidance, partial results, and admin configuration", () => { renderPage("/security?tab=logs"); expect(screen.getByText("Select a proxy host to browse its logs.")).toBeInTheDocument(); fireEvent.change(screen.getByLabelText("Proxy host"), { target: { value: "7" } }); expect(screen.getByText("Results are partial because the bounded scan limit was reached.")).toBeInTheDocument(); fireEvent.click(screen.getByRole("button", { name: "Configuration" })); expect(screen.getByLabelText("Detailed event retention (days)")).toHaveValue(30); });
+	it("labels the retention save control instead of rendering its message id", () => { renderPage("/security?tab=settings"); expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument(); expect(screen.queryByText("action.save")).not.toBeInTheDocument(); });
+	it("reports whether Nginx actually received the security logging configuration", () => {
+		hooks.nginxUpgrade = { ...upgraded, hostsUpgraded: 2, hostsSkipped: 1, reloadDeferred: true, lastErrorSummary: "proxy host 7: missing certificate" };
+		renderPage("/security?tab=settings");
+		expect(screen.getByText(/not active on every enabled proxy host/)).toBeInTheDocument();
+		expect(screen.getByText("proxy host 7: missing certificate")).toBeInTheDocument();
+		cleanup();
+		hooks.nginxUpgrade = upgraded;
+		renderPage("/security?tab=settings");
+		expect(screen.getByText(/is active on every enabled proxy host/)).toBeInTheDocument();
+	});
 });

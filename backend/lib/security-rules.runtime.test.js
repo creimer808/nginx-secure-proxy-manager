@@ -7,7 +7,7 @@ import { after, before, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
-const projectRoot = path.resolve(dirname, "../../../../../../");
+const projectRoot = path.resolve(dirname, "../..");
 const image = process.env.SECURITY_NGINX_TEST_IMAGE;
 const runtimeEnabled = Boolean(image);
 let tmp = "";
@@ -51,6 +51,16 @@ server {
   access_log /data/logs/proxy-host-legacy_security.log security_json if=$security_log_enabled;
   error_log /data/logs/proxy-host-legacy_error.log warn;
   include conf.d/include/block-exploits.conf;
+  location / { return 200 "ok\\n"; }
+}
+# This mirrors the default/fallback server: no proxy host owns the request, so
+# the record carries an empty id and stays administrator-only.
+server {
+  listen 8083;
+  access_log /data/logs/fallback_security.log security_json if=$security_log_enabled;
+  error_log /data/logs/fallback_http_error.log warn;
+  include conf.d/include/block-exploits.conf;
+  location = /status404 { return 404; }
   location / { return 200 "ok\\n"; }
 }
 server {
@@ -134,7 +144,7 @@ describe("security attribution Nginx runtime", { skip: !runtimeEnabled && "Set S
 		const mount = (source, target) => ["-v", `${source}:${target}:ro`];
 		const args = [
 			"run", "-d", "--name", containerName,
-			"-p", "127.0.0.1::8080", "-p", "127.0.0.1::8081", "-p", "127.0.0.1::8082",
+			"-p", "127.0.0.1::8080", "-p", "127.0.0.1::8081", "-p", "127.0.0.1::8082", "-p", "127.0.0.1::8083",
 			...mount(path.join(projectRoot, "docker/rootfs/etc/nginx/nginx.conf"), "/etc/nginx/nginx.conf"),
 			...mount(path.join(projectRoot, "docker/rootfs/etc/nginx/conf.d/include/log-proxy.conf"), "/etc/nginx/conf.d/include/log-proxy.conf"),
 			...mount(path.join(projectRoot, "docker/rootfs/etc/nginx/conf.d/include/security-rules.conf"), "/etc/nginx/conf.d/include/security-rules.conf"),
@@ -145,7 +155,7 @@ describe("security attribution Nginx runtime", { skip: !runtimeEnabled && "Set S
 			"-c", "printf 'npm:x:1000:1000::/nonexistent:/usr/sbin/nologin\\n' >> /etc/passwd; printf 'npm:x:1000:\\n' >> /etc/group; nginx", 
 		];
 		docker(args);
-		ports = { enabled: hostPort(8080), legacy: hostPort(8081), disabled: hostPort(8082) };
+		ports = { enabled: hostPort(8080), legacy: hostPort(8081), disabled: hostPort(8082), fallback: hostPort(8083) };
 		let running = false;
 		for (let attempt = 0; attempt < 20; attempt += 1) {
 			if (spawnSync("curl", ["-sS", `http://127.0.0.1:${ports.enabled}/`], { encoding: "utf8" }).status === 0) {
@@ -210,5 +220,17 @@ describe("security attribution Nginx runtime", { skip: !runtimeEnabled && "Set S
 		assert.equal(requestStatus(ports.legacy, "/?union=select("), "403");
 		assert.equal(requestStatus(ports.disabled, "/?union=select("), "200");
 		assert.equal(securityEvents("proxy-host-13_security.log").length, 0);
+	});
+
+	it("records unattributed traffic that never reaches a proxy host", () => {
+		assert.equal(requestStatus(ports.fallback, "/?union=select("), "403");
+		assert.equal(requestStatus(ports.fallback, "/status404"), "404");
+		assert.equal(requestStatus(ports.fallback, "/benign"), "200");
+		const events = securityEvents("fallback_security.log");
+		assert.equal(events.length, 2, "a 200 must not be recorded");
+		assert.equal(events[0].proxy_host_id, "");
+		assert.equal(events[0].rule_id, "sql.union-select");
+		assert.equal(events[0].event_type, "exploit_rule");
+		assert.equal(events[1].event_type, "http_status");
 	});
 });

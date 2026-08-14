@@ -12,10 +12,10 @@
 
 | Version | Value |
 | --- | --- |
-| NSPM application | `0.1.2` |
+| NSPM application | `0.1.3` |
 | Nginx Proxy Manager compatibility baseline | `2.15.1` |
 
-NSPM releases use their own semantic version (`v0.1.2`). The upstream baseline is shown separately so users can determine which stable NPM release supplied the core behavior. See [UPSTREAM.md](UPSTREAM.md) for the synchronization policy.
+NSPM releases use their own semantic version (`v0.1.3`). The upstream baseline is shown separately so users can determine which stable NPM release supplied the core behavior. See [UPSTREAM.md](UPSTREAM.md) for the synchronization policy.
 
 ## Features
 
@@ -33,7 +33,7 @@ NSPM releases use their own semantic version (`v0.1.2`). The upstream baseline i
 ```yaml
 services:
   app:
-    image: ghcr.io/creimer808/nginx-secure-proxy-manager:0.1.2
+    image: ghcr.io/creimer808/nginx-secure-proxy-manager:0.1.3
     restart: unless-stopped
     ports:
       - "80:80"
@@ -54,6 +54,8 @@ Pin an NSPM image digest in production. A numbered tag identifies a release but 
 The dashboard is designed to make proxy activity easier to review without replacing a SIEM, IDS, or log-retention program. It summarizes access-log data locally and applies bounded retention. Validate decisions against your authoritative logs and monitoring systems before taking action.
 
 The top-level **Security** page provides request-level events, stable built-in rule attribution, administrator-only global/fallback logs, authorized per-host raw logs, and configurable 7–365 day detailed-event retention. Full URIs and query strings are retained, so review the privacy, storage, client-IP trust, upgrade, and operational guidance in [Security investigation](docs/security-investigation.md) before enabling the feature on sensitive workloads.
+
+> The Security page collected no data in `0.1.2`. Upgrade to `0.1.3`; see [Security investigation](docs/security-investigation.md) for what failed and why nothing can be recovered.
 
 <p align="center">
   <img src="readme-security-dashboard.png" alt="NSPM security and traffic dashboard showing request totals, bandwidth, HTTP status trends, security posture, top proxy hosts, and observed client errors">

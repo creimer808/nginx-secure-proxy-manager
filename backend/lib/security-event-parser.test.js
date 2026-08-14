@@ -31,6 +31,17 @@ describe("security event parser", () => {
 		assert.equal(event.upstream_status, null);
 	});
 
+	it("accepts an unattributed fallback record and still rejects a host mismatch", () => {
+		// The default/fallback servers emit no proxy host id. A null context host
+		// keeps those records unattributed rather than discarding them.
+		const fallbackContext = { proxyHostId: null, segmentId: "fallback", lineOffset: 0 };
+		const event = parseSecurityAccessLine(JSON.stringify(payload({ proxy_host_id: "" })), fallbackContext);
+		assert.equal(event.proxy_host_id, null);
+		assert.equal(event.event_type, "exploit_rule");
+		assert.throws(() => parseSecurityAccessLine(JSON.stringify(payload()), fallbackContext), /proxy host mismatch/);
+		assert.throws(() => parseSecurityAccessLine(JSON.stringify(payload({ proxy_host_id: "" })), context), /Missing proxy_host_id/);
+	});
+
 	it("rejects malformed, inconsistent, invalid-IP, and oversized input", () => {
 		assert.throws(() => parseSecurityAccessLine("{", context));
 		assert.throws(() => parseSecurityAccessLine(JSON.stringify(payload({ event_type: "http_status" })), context));

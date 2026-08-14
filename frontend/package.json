@@ -1,6 +1,6 @@
 {
 	"name": "@cybersec-cam/nginx-secure-proxy-manager",
-	"version": "0.1.2",
+	"version": "0.1.3",
 	"type": "module",
 	"author": "CyberSec.Cam (https://www.cybersec.cam)",
 	"license": "MIT",
@@ -13,6 +13,7 @@
 		"locale-extract": "formatjs extract 'src/**/*.tsx'",
 		"locale-compile": "formatjs compile-folder src/locale/src src/locale/lang",
 		"locale-sort": "./src/locale/scripts/locale-sort.sh",
+		"check-locales": "node check-locales.cjs",
 		"test": "vitest"
 	},
 	"dependencies": {
