@@ -4,6 +4,7 @@ import { basename, sep } from "node:path";
 import db from "../db.js";
 import errs from "../lib/error.js";
 import { openSecurityLog, readSecurityLog } from "../lib/security-log-reader.js";
+import { RULE_IDS, RULESET_VERSION, SECURITY_RULES } from "../lib/security-rule-catalog.js";
 
 let logDirectory = "/data/logs";
 let databaseFactory = db;
@@ -23,13 +24,6 @@ const MAX_SCANS_PER_WINDOW = 12;
 const requestScans = new Map();
 let activeScans = 0;
 
-const RULES = [
-	["sql.union-select", "sql", "Built-in SQL union/select signature"], ["sql.union-all-select", "sql", "Built-in SQL union-all-select signature"], ["sql.concat", "sql", "Built-in SQL concat signature"],
-	["file.remote-url-parameter", "file", "Remote URL parameter"], ["file.path-traversal", "file", "Path traversal parameter"], ["file.absolute-path", "file", "Absolute-path parameter"],
-	["common.script-tag", "common", "Script-tag parameter"], ["php.globals", "common", "PHP GLOBALS parameter"], ["php.request", "common", "PHP REQUEST parameter"], ["lfi.proc-self-environ", "common", "Local file inclusion signature"], ["joomla.mosconfig", "common", "Joomla mosConfig signature"], ["php.base64-code", "common", "PHP base64 code signature"],
-	["spam.keyword-group-1", "spam", "Spam keyword group 1"], ["spam.keyword-group-2", "spam", "Spam keyword group 2"], ["spam.keyword-group-3", "spam", "Spam keyword group 3"], ["spam.keyword-group-4", "spam", "Spam keyword group 4"],
-	["ua.indy-library", "user-agent", "Indy Library user agent"], ["ua.libwww-perl", "user-agent", "libwww-perl user agent"], ["ua.getright", "user-agent", "GetRight user agent"], ["ua.getweb", "user-agent", "GetWeb user agent"], ["ua.gozilla", "user-agent", "Go!Zilla user agent"], ["ua.download-demon", "user-agent", "Download Demon user agent"], ["ua.go-ahead-got-it", "user-agent", "Go-Ahead-Got-It user agent"], ["ua.turnitinbot", "user-agent", "TurnitinBot user agent"], ["ua.grabnet", "user-agent", "GrabNet user agent"],
-];
 const eventTypes = new Set(["exploit_rule", "http_status", "nginx_error"]);
 const severities = new Set(["low", "medium", "high", "critical"]);
 const methods = new Set(["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "CONNECT", "TRACE"]);
@@ -117,7 +111,7 @@ const validateEventFilters = (input) => {
 	const clientIp = input.client_ip === undefined ? null : String(input.client_ip);
 	if (clientIp && net.isIP(clientIp) === 0) throw new errs.ValidationError("Invalid client_ip");
 	const ruleId = input.rule_id === undefined ? null : String(input.rule_id);
-	if (ruleId && (!RULES.some(([id]) => id === ruleId) || ruleId.length > 128)) throw new errs.ValidationError("Invalid rule_id");
+	if (ruleId && (!RULE_IDS.has(ruleId) || ruleId.length > 128)) throw new errs.ValidationError("Invalid rule_id");
 	return { from, to, query, status, statusClass, hostId, clientIp, ruleId, eventType: enumFilter("event_type", eventTypes), severity: enumFilter("severity", severities), method: enumFilter("method", methods), limit: input.limit === undefined ? PAGE_DEFAULT : parseInteger(input.limit, "limit", 1, PAGE_MAX), cursor: decodeCursor(input.cursor, ["t", "i"]) };
 };
 
@@ -176,7 +170,7 @@ const rules = async (access, range) => {
 	const actor = await securityAccess(access, "security:rules");
 	const rows = await visibleBase(actor, rangeSince(range)).whereNotNull("e.rule_id").select("e.rule_id").count("e.id as count").groupBy("e.rule_id");
 	const counts = new Map(rows.map((row) => [row.rule_id, Number(row.count)]));
-	return RULES.map(([id, category, description]) => ({ id, category, description, action: "block", ruleset_version: "2026-08-13", count: counts.get(id) || 0 }));
+	return SECURITY_RULES.map((rule) => ({ ...rule, ruleset_version: RULESET_VERSION, count: counts.get(rule.id) || 0 }));
 };
 
 const rotationNames = (hostId, kind) => {

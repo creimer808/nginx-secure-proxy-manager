@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
+import { RULESET_VERSION, SECURITY_RULES } from "./security-rule-catalog.js";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(dirname, "../..");
@@ -15,22 +16,41 @@ const template = read("backend/templates/proxy_host.conf");
 const logrotate = read("docker/rootfs/etc/logrotate.d/nginx-proxy-manager");
 const setup = read("backend/setup.js");
 
-const expectedRules = [
-	"sql.union-select", "sql.union-all-select", "sql.concat", "file.remote-url-parameter", "file.path-traversal",
-	"file.absolute-path", "common.script-tag", "php.globals", "php.request", "lfi.proc-self-environ",
-	"joomla.mosconfig", "php.base64-code", "spam.keyword-group-1", "spam.keyword-group-2", "spam.keyword-group-3",
-	"spam.keyword-group-4", "ua.indy-library", "ua.libwww-perl", "ua.getright", "ua.getweb", "ua.gozilla",
-	"ua.download-demon", "ua.go-ahead-got-it", "ua.turnitinbot", "ua.grabnet",
-];
-
 const securityLogrotateBlock = logrotate.match(/\/data\/logs\/\*_security\.log \{[\s\S]*?\n\}/)?.[0] || "";
 
+/**
+ * Nginx is the only thing that actually detects. The JavaScript catalog exists
+ * so the API can validate a rule_id and serve a rule list, which makes it a
+ * duplicate of the .conf and therefore free to drift. These helpers parse the
+ * .conf so the drift becomes a test failure instead of a wrong rule catalog.
+ */
+const mapBody = (targetVariable) => {
+	const match = new RegExp(`map\\s+\\S+\\s+\\$${targetVariable}\\s*\\{([\\s\\S]*?)\\n\\}`).exec(rules);
+	assert.ok(match, `security-rules.conf defines no map for $${targetVariable}`);
+	return match[1];
+};
+/** Rule ids are the map *values*: the token immediately before the terminating semicolon. */
+const ruleIdsIn = (body) => (body.match(/([a-z][a-z0-9-]*\.[a-z0-9-]+);/g) || []).map((entry) => entry.slice(0, -1));
+/** `~^sql\.  sql;` => sql -> sql */
+const categoryByPrefix = new Map(
+	[...mapBody("security_rule_category").matchAll(/~\^([a-z0-9]+)\\\.\s+([a-z-]+);/g)].map((match) => [match[1], match[2]]),
+);
+
 describe("security attribution Nginx contract", () => {
-	it("keeps every legacy signature mapped to one stable rule ID", () => {
-		for (const id of expectedRules) {
-			assert.match(rules, new RegExp(`${id.replace(".", "\\.")};`));
+	it("keeps the JavaScript rule catalog identical to the Nginx ruleset", () => {
+		const detected = [...new Set([...ruleIdsIn(mapBody("security_query_rule_id")), ...ruleIdsIn(mapBody("security_user_agent_rule_id"))])];
+		assert.deepEqual(detected.slice().sort(), SECURITY_RULES.map((rule) => rule.id).sort(), "rule ids differ between security-rules.conf and security-rule-catalog.js");
+
+		// A rule whose prefix has no category entry silently logs an empty
+		// category, which is invisible until someone tries to filter by it.
+		for (const rule of SECURITY_RULES) {
+			const prefix = rule.id.split(".")[0];
+			assert.equal(categoryByPrefix.get(prefix), rule.category, `rule ${rule.id} is categorised as ${categoryByPrefix.get(prefix)} by Nginx but ${rule.category} by the catalog`);
 		}
-		assert.equal((rules.match(/\b(?:sql|file|common|php|lfi|joomla|spam|ua)\.[a-z0-9-]+;/g) || []).length, expectedRules.length);
+	});
+
+	it("stamps the catalog's ruleset version into every record", () => {
+		assert.ok(logFormat.includes(`"ruleset_version":"${RULESET_VERSION}"`), `log-proxy.conf must stamp ruleset_version ${RULESET_VERSION}`);
 	});
 
 	it("preserves first-match priority for overlapping query and user-agent rules", () => {

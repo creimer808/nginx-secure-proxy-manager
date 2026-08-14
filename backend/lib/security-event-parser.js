@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import net from "node:net";
+import { RULE_ID_PREFIXES } from "./security-rule-catalog.js";
 
 const MAX_EVENT_BYTES = 256 * 1024;
 const SECURITY_SCHEMA_VERSION = "1";
@@ -7,7 +8,7 @@ const EVENT_TYPES = new Set(["exploit_rule", "http_status"]);
 const SEVERITIES = new Set(["low", "medium", "high", "critical"]);
 const METHOD_PATTERN = /^[!#$%&'*+.^_`|~0-9A-Z-]{1,32}$/;
 const OBSERVATION_STATUSES = new Set([401, 403, 404, 429]);
-const RULE_ID = /^(?:sql|file|common|php|lfi|joomla|spam|ua)\.[a-z0-9-]+$/;
+const RULE_ID = new RegExp(`^(?:${RULE_ID_PREFIXES.join("|")})\\.[a-z0-9-]+$`);
 
 const asString = (value, name, { required = false, max = 65535 } = {}) => {
 	if (value === undefined || value === null || value === "") {
