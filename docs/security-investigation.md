@@ -2,6 +2,13 @@
 
 The top-level **Security** page turns locally generated Nginx telemetry into an investigation aid. It complements the lightweight aggregate dashboard; it is not an IDS, SIEM, or proof that a client is malicious or an application was compromised.
 
+Two pages, with a deliberate division:
+
+- **Security** — findings and analysis. What stands out, why, and a link to the evidence.
+- **Logs** — the explorer. Event search with filters, and the raw Nginx logs behind them.
+
+Anything that answers "show me the records themselves" lives under **Logs**. Links to the old `Security → Events` and `Security → Raw Logs` tabs redirect there and keep their filters.
+
 > **v0.1.2 collected no data.** In v0.1.2 the Security page shipped functionally inert. Nginx never received the security logging directive — the startup upgrade's commit gate included a reload that lost a startup race and rolled every host back — and the collector spent its whole per-cycle budget re-hashing existing log archives, so it could never advance a cursor. Both failures were silent: startup logs looked healthy and the page showed an empty but "Available" collector.
 >
 > v0.1.3 fixes both. There is nothing to recover: no telemetry from the v0.1.2 period was ever written, and no backfill is performed. Collection begins from the point v0.1.3 starts.
@@ -39,6 +46,26 @@ Nginx error-log lines are collected as `nginx_error` events. They are operationa
 
 They are therefore excluded from the security totals, the timeline, and every top-N list, and from event search unless `include_operational=true` is set. Nothing operational is recorded above `medium` severity. The raw error logs remain browsable in full.
 
+## Findings
+
+A single 404 is not information. Four hundred distinct 404s from one address in ninety seconds is. The **Security** page leads with findings: patterns computed over the collected events at the moment you ask, with the evidence filter attached to each one.
+
+| Finding | What it looks for |
+| --- | --- |
+| Path scanning | One source, many distinct missing paths |
+| Credential brute force | One source, repeated `401`s against a single host |
+| Rule-match campaign | One source matching several distinct rules |
+| Forced browsing | Sustained `403`s from one source, usually access-list denials |
+| Rate-limit tripping | Clustered `429`s from one source |
+| Scanner tooling | Anything attributed to a `scanner.*` rule |
+| Server error spike | A host's `5xx` rate jumping against its own hourly baseline |
+
+Severity is derived from volume and distinctness rather than mapped from the finding's type, so ten times a threshold reads differently from barely reaching it. A source that trips two unrelated detectors is escalated one level; that correlation is the only route to `critical`.
+
+The error spike is flagged **operational** and kept out of the security counts — a `5xx` cluster is far more often a broken upstream than an attack.
+
+Findings are computed on read from the same indexes the event list uses, memoized for 30 seconds, and never stored. They are read-only: NSPM does not block addresses, rate-limit, or notify. "View evidence" opens **Logs** with exactly the filter the detector counted, so the claim and the records behind it cannot drift apart.
+
 Detailed records include the full URI and query string, request method and protocol, interpreted client IP, immediate peer IP and port, status/upstream status, sizes and timing, TLS metadata, user agent, referrer, and Nginx error text. NSPM does **not** collect request bodies, cookies, `Authorization` values, or arbitrary request headers.
 
 Full query strings can contain credentials or tokens. Security API responses use `private, no-store`, and the UI keeps free-text searches out of browser page history, but operators should still avoid placing secrets in URLs.
@@ -58,7 +85,7 @@ Detailed database events default to **30 days**. Administrators can set an integ
 
 Database retention does not remove raw log rotations, database backups, filesystem snapshots, or copied exports. Security logs rotate daily or at 50 MiB, retain 30 rotations, use delayed gzip compression, and are created with mode `0640`. Database and raw-log retention are intentionally separate.
 
-The collector is bounded per cycle and pauses indexed ingestion when its configured high-water controls activate. Raw source logs remain the evidence source while backlog is deferred. Collector health is shown on the Security Overview; exact global counters are administrator-only.
+The collector is bounded per cycle and pauses indexed ingestion when its configured high-water controls activate. Raw source logs remain the evidence source while backlog is deferred. Collector health is shown on the Security Overview as a status pill, which expands into an alert only when it is degraded; exact global counters are administrator-only.
 
 ### Collector configuration
 
