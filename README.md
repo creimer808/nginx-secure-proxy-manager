@@ -22,6 +22,7 @@ NSPM releases use their own semantic version (`v0.1.3`). The upstream baseline i
 - NPM-compatible proxy hosts, redirections, streams, certificates, access lists, users, permissions, and audit log.
 - A security and traffic dashboard for recent request volume, status trends, and potentially suspicious sources.
 - A permission-aware Security investigation page with attributed built-in rule matches, searchable detailed events, raw-log browsing, and bounded retention.
+- Detection independent of blocking: every host is told what matched, whether or not it enforces, across path probes, injection payloads, and scanner tooling as well as the inherited exploit signatures.
 - Let's Encrypt certificates, custom certificates, and advanced Nginx configuration.
 - Multi-architecture container images for `amd64` and `arm64`.
 

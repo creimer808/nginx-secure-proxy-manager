@@ -12,6 +12,7 @@ let getEvent;
 let listEvents;
 let getRetention;
 let listLogFiles;
+let overview;
 let readLog;
 let resetSecurityApiTestState;
 let updateRetention;
@@ -53,7 +54,7 @@ before(async () => {
 	process.env.NODE_ENV = "test";
 	process.env.NODE_CONFIG_DIR = configDirectory;
 	process.env.NSPM_KEYS_FILE = path.join(configDirectory, "keys.json");
-	({ configureSecurityApiForTesting, getEvent, getRetention, listEvents, listLogFiles, readLog, resetSecurityApiTestState, updateRetention } = await import("./security-api.js"));
+	({ configureSecurityApiForTesting, getEvent, getRetention, listEvents, listLogFiles, overview, readLog, resetSecurityApiTestState, updateRetention } = await import("./security-api.js"));
 	logDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "security-api-"));
 	database = knex({ client: "better-sqlite3", connection: { filename: ":memory:" }, useNullAsDefault: true });
 	await database.schema.createTable("proxy_host", (table) => {
@@ -99,6 +100,52 @@ describe("security API database-backed authorization and raw-log boundaries", ()
 		assert.equal((await listEvents(access({ userId: 10 }), { from: String(now - 1), to: String(now + 1) })).items.length, 0);
 		assert.equal((await listEvents(access({ userId: 20 }), { from: String(now - 1), to: String(now + 1) })).items.length, 2);
 		await assert.rejects(() => listEvents(access({ userId: 10, allowed: false }), {}), { status: 403 });
+	});
+
+	it("keeps operational error-log records out of the security surfaces by default", async () => {
+		await insertHost(5, 50);
+		const operational = { proxy_host_id: 5, source_kind: "nginx_error", event_type: "nginx_error", severity: "low", status: null, request_uri: null, nginx_error_level: "error", nginx_error_message: "upstream timed out" };
+		await database("security_event").insert([
+			event({ id: 10, event_id: "event-00000000000010", ingest_line_offset: 10, proxy_host_id: 5, event_type: "http_status", severity: "low", status: 404, client_ip: "203.0.113.9", method: "GET" }),
+			event({ ...operational, id: 11, event_id: "event-00000000000011", ingest_line_offset: 11 }),
+			event({ ...operational, id: 12, event_id: "event-00000000000012", ingest_line_offset: 12 }),
+		]);
+		const actor = access({ userId: 50 });
+		const window = { from: String(now - 1), to: String(now + 1) };
+		const ids = (result) => result.items.map((row) => row.id).sort((a, b) => a - b);
+
+		assert.deepEqual(ids(await listEvents(actor, window)), [10]);
+		assert.deepEqual(ids(await listEvents(actor, { ...window, include_operational: "true" })), [10, 11, 12]);
+		// Naming the operational type is itself an explicit request for it, and is
+		// honoured without also having to set the toggle.
+		assert.deepEqual(ids(await listEvents(actor, { ...window, event_type: "nginx_error" })), [11, 12]);
+		await assert.rejects(() => listEvents(actor, { ...window, include_operational: "yes" }), { status: 400 });
+
+		const report = await overview(actor, "24h");
+		assert.equal(report.total_events, 1, "error-log rows must not inflate the security total");
+		assert.equal(report.operational_events, 2);
+		assert.equal(report.timeline.reduce((sum, point) => sum + point.count, 0), 1);
+		// Error-log rows do carry a proxy_host_id, so before this exclusion the
+		// host ranking measured error-log volume rather than attack surface.
+		assert.deepEqual(report.top_hosts, [{ proxy_host_id: 5, count: 1 }]);
+	});
+
+	it("serves the overview from a short-lived memo without caching the authorization decision", async () => {
+		await insertHost(6, 60);
+		const observation = { proxy_host_id: 6, event_type: "http_status", severity: "low", status: 404 };
+		await database("security_event").insert([event({ ...observation, id: 20, event_id: "event-00000000000020", ingest_line_offset: 20 })]);
+		const actor = access({ userId: 60 });
+		assert.equal((await overview(actor, "24h")).total_events, 1);
+
+		await database("security_event").insert([event({ ...observation, id: 21, event_id: "event-00000000000021", ingest_line_offset: 21 })]);
+		assert.equal((await overview(actor, "24h")).total_events, 1, "a repeat inside the TTL must not re-run the aggregates");
+		// A different window is a different question, so it is a different entry.
+		assert.equal((await overview(actor, "7d")).total_events, 2);
+
+		// Whether the caller may ask at all, and whether the range is valid, are
+		// both settled before the memo is consulted.
+		await assert.rejects(() => overview(access({ userId: 60, allowed: false }), "24h"), { status: 403 });
+		await assert.rejects(() => overview(actor, "90d"), { status: 400 });
 	});
 
 	it("resolves only authorized allowlisted raw files and prevents global, symlink, hardlink, rotation, and cursor bypasses", async () => {

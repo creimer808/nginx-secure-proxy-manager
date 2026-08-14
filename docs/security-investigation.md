@@ -10,10 +10,34 @@ The top-level **Security** page turns locally generated Nginx telemetry into an 
 
 A dedicated JSON Lines log is written for each proxy host when either:
 
-- a built-in exploit rule matches; or
+- a built-in rule matches; or
 - the final response is `401`, `403`, `404`, `429`, or `5xx`.
 
-Rule matches include a stable rule ID, category, action, and ruleset version. Status-only events are observations and have no exploit attribution. Exact attribution starts only after the upgraded Nginx configuration is active; older `403` responses cannot be attributed retroactively.
+Rule matches include a stable rule ID, category, action, and ruleset version. Status-only events are observations and have no rule attribution. Exact attribution starts only after the upgraded Nginx configuration is active; older `403` responses cannot be attributed retroactively.
+
+### Detection and blocking are separate
+
+Every host is told what matched, whether or not it blocks. `rule_action` records what actually happened to the request:
+
+| Action | Meaning | Severity |
+| --- | --- | --- |
+| `block` | An upstream-inherited signature matched on a host with **Block Common Exploits** enabled. The request received a `403`. | `high` |
+| `detect` | A match that changed nothing about the response — either a detect-only rule, or an inherited signature on a host that has blocking switched off. | `medium` |
+
+Earlier releases gated attribution on the blocking switch, so a host with **Block Common Exploits** off recorded no rule matches at all. Enabling blocking is no longer a prerequisite for seeing what is being attempted, and turning it on or off does not change which rules are evaluated — only whether the inherited ones return `403`.
+
+The rule catalog has two groups:
+
+- **Inherited signatures** (`sql.*`, `file.*`, `common.*`, `php.*`, `lfi.*`, `joomla.*`, `spam.*`, `ua.*`) come from upstream's `block-exploits.conf`. These are the only rules that can block, and only when the host opts in.
+- **Detect-only rules** (`path.*`, `inject.*`, `scanner.*`) never change a response. Each matches something that is legitimate somewhere — `/actuator` on a Spring host, `/cgi-bin` on genuinely old software — so they are evidence to review, not grounds to break a working site.
+
+Where a request matches both groups, the inherited signature wins, so blocking decisions land exactly where they did before the detect-only rules existed.
+
+### Operational records are not security findings
+
+Nginx error-log lines are collected as `nginx_error` events. They are operational observations: failed TLS handshakes, upstream timeouts, clients that hung up mid-request. One flapping upstream produces thousands, and they carry no client IP, status, method, or rule.
+
+They are therefore excluded from the security totals, the timeline, and every top-N list, and from event search unless `include_operational=true` is set. Nothing operational is recorded above `medium` severity. The raw error logs remain browsable in full.
 
 Detailed records include the full URI and query string, request method and protocol, interpreted client IP, immediate peer IP and port, status/upstream status, sizes and timing, TLS metadata, user agent, referrer, and Nginx error text. NSPM does **not** collect request bodies, cookies, `Authorization` values, or arbitrary request headers.
 
@@ -84,5 +108,7 @@ The static Nginx contract tests run with the backend Node tests. The runtime att
 SECURITY_NGINX_TEST_IMAGE=<candidate-image> \
   node --test backend/lib/security-rules.runtime.test.js
 ```
+
+It mounts the repository's `nginx.conf`, `security-rules.conf`, `block-exploits.conf`, and `log-proxy.conf` over the image, so it tests the working tree against that image's surrounding configuration. It asserts one case per rule, that detect-only rules leave the response untouched, that ordinary traffic produces no record at all, and that an inherited signature still wins over an overlapping detect-only rule.
 
 Do not use an unrelated or stale image when validating a release. MySQL and PostgreSQL migration/API checks should also be run in the repository's database CI matrix before release.
