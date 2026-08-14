@@ -1,0 +1,31 @@
+{
+	"operationId": "securityFindings",
+	"summary": "Behavioural security findings",
+	"description": "Patterns computed over the visible security events in the requested range: path scanning, credential brute force, rule-match campaigns, forced browsing, rate-limit tripping, scanner tooling, and operational 5xx spikes. Read-only; nothing here blocks or notifies.",
+	"tags": ["security"],
+	"security": [{ "bearerAuth": [] }],
+	"parameters": [{ "name": "range", "in": "query", "required": true, "schema": { "type": "string", "enum": ["24h", "7d", "30d"] } }],
+	"responses": {
+		"200": {
+			"description": "Findings for the requested window",
+			"headers": { "$ref": "./common.json#/headers" },
+			"content": {
+				"application/json": {
+					"schema": {
+						"type": "object",
+						"properties": {
+							"range": { "type": "string", "enum": ["24h", "7d", "30d"] },
+							"generated_at": { "type": "integer" },
+							"window": { "type": "object", "properties": { "from": { "type": "integer" }, "to": { "type": "integer" } } },
+							"counts": { "type": "object", "additionalProperties": { "type": "integer" } },
+							"truncated": { "type": "boolean" },
+							"findings": { "type": "array", "items": { "$ref": "../../components/security-finding-object.json" } }
+						}
+					}
+				}
+			}
+		},
+		"400": { "description": "Invalid range" },
+		"403": { "description": "Permission denied" }
+	}
+}

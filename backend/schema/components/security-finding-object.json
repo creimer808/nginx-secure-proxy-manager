@@ -1,0 +1,24 @@
+{
+	"type": "object",
+	"description": "A behavioural pattern computed over security events. A claim that something is worth a human look, with the evidence filter attached.",
+	"required": ["id", "type", "severity", "first_seen", "last_seen", "evidence_count", "subject", "filter"],
+	"properties": {
+		"id": { "type": "string", "description": "Deterministic hash of type, subject, and window. Stable across polls and processes." },
+		"type": { "type": "string", "enum": ["path_scanning", "credential_brute_force", "rule_match_campaign", "forced_browsing", "rate_limit_tripping", "scanner_tooling", "error_spike"] },
+		"severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+		"operational": { "type": "boolean", "description": "True for findings that describe service health rather than a security concern." },
+		"first_seen": { "type": "integer" },
+		"last_seen": { "type": "integer" },
+		"evidence_count": { "type": "integer" },
+		"subject": {
+			"type": "object",
+			"properties": {
+				"client_ip": { "type": ["string", "null"] },
+				"proxy_host_id": { "type": ["integer", "null"] },
+				"host_domain": { "type": ["string", "null"] }
+			}
+		},
+		"metrics": { "type": "object", "additionalProperties": { "type": "number" }, "description": "Detector-specific numbers behind the finding, such as distinct URIs or matched rules." },
+		"filter": { "type": "object", "description": "Event filter that reproduces the evidence, ready to become a /logs query string." }
+	}
+}

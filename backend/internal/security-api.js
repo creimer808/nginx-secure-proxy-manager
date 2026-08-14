@@ -4,6 +4,7 @@ import { basename, sep } from "node:path";
 import db from "../db.js";
 import errs from "../lib/error.js";
 import { openSecurityLog, readSecurityLog } from "../lib/security-log-reader.js";
+import { createMemo } from "../lib/security-memo.js";
 import { RULE_IDS, RULESET_VERSION, SECURITY_RULES } from "../lib/security-rule-catalog.js";
 
 let logDirectory = "/data/logs";
@@ -128,7 +129,9 @@ const listEvents = async (access, input) => {
 	const f = validateEventFilters(input);
 	if (f.hostId) await authorizeHost(actor, f.hostId);
 	const query = applyVisibleEvents(databaseFactory()("security_event as e"), actor)
-		.select("e.id", "e.event_id", "e.occurred_at_ms", "e.proxy_host_id", "e.event_type", "e.severity", "e.rule_id", "e.client_ip", "e.method", "e.request_uri", "e.status", "e.request_time_ms", "e.host_domain_snapshot")
+		// user_agent was searchable but not projected, so a text search could match
+		// a row whose matching field the list never showed.
+		.select("e.id", "e.event_id", "e.occurred_at_ms", "e.proxy_host_id", "e.event_type", "e.severity", "e.rule_id", "e.client_ip", "e.method", "e.request_uri", "e.status", "e.request_time_ms", "e.host_domain_snapshot", "e.user_agent")
 		.whereBetween("e.occurred_at_ms", [f.from, f.to]);
 	// Asking for event_type=nginx_error is an explicit request for operational
 	// records and is honoured on its own; the toggle only governs the default mix.
@@ -158,32 +161,13 @@ const getEvent = async (access, eventId) => {
 
 /**
  * overview() runs eight aggregate queries over a table with no upper bound, and
- * the page polls it. What it returns is a 24-hour-to-30-day rollup, so serving
- * one a few seconds stale costs nothing, while re-deriving it on every refresh
- * scans the event table eight more times. Collector lag is reported from the
- * same snapshot and is therefore also up to one TTL behind.
+ * the page polls it. Collector lag is reported from the same snapshot and is
+ * therefore also up to one TTL behind. See lib/security-memo.js for why.
  */
-const OVERVIEW_CACHE_TTL_MS = 30_000;
-const OVERVIEW_CACHE_MAX_ENTRIES = 200;
-const overviewCache = new Map();
+const overviewCache = createMemo({ ttlMs: 30_000, maxEntries: 200 });
 // Every input that changes the result: who is asking, what they can see, and
 // over what window.
 const overviewCacheKey = (actor, range) => JSON.stringify([actor.admin, actor.visibility, actor.userId, range]);
-const readOverviewCache = (key) => {
-	const entry = overviewCache.get(key);
-	if (!entry) return null;
-	if (entry.expiresAt <= Date.now()) {
-		overviewCache.delete(key);
-		return null;
-	}
-	return entry.value;
-};
-const writeOverviewCache = (key, value) => {
-	// Bounded so a large user population cannot grow this without limit. Map
-	// iterates in insertion order, so this evicts the oldest entry.
-	if (overviewCache.size >= OVERVIEW_CACHE_MAX_ENTRIES) overviewCache.delete(overviewCache.keys().next().value);
-	overviewCache.set(key, { value, expiresAt: Date.now() + OVERVIEW_CACHE_TTL_MS });
-};
 
 const rangeSince = (range) => {
 	if (!["24h", "7d", "30d"].includes(range)) throw new errs.ValidationError("Invalid range");
@@ -197,7 +181,7 @@ const overview = async (access, range) => {
 	// revoked permission nor a bad range can be served from it.
 	const since = rangeSince(range);
 	const cacheKey = overviewCacheKey(actor, range);
-	const cached = readOverviewCache(cacheKey);
+	const cached = overviewCache.read(cacheKey);
 	if (cached) return cached;
 	const totals = await visibleBase(actor, since).first().sum({ total_events: databaseFactory().raw("case when e.event_type <> 'nginx_error' then 1 else 0 end"), operational_events: databaseFactory().raw("case when e.event_type = 'nginx_error' then 1 else 0 end"), exploit_rule_matches: databaseFactory().raw("case when e.event_type = 'exploit_rule' then 1 else 0 end"), status_401: databaseFactory().raw("case when e.status = 401 then 1 else 0 end"), status_403: databaseFactory().raw("case when e.status = 403 then 1 else 0 end"), status_404: databaseFactory().raw("case when e.status = 404 then 1 else 0 end"), status_429: databaseFactory().raw("case when e.status = 429 then 1 else 0 end"), status_5xx: databaseFactory().raw("case when e.status >= 500 then 1 else 0 end") });
 	// Every aggregate below is a *security* view. Error-log rows carry no client
@@ -205,7 +189,10 @@ const overview = async (access, range) => {
 	// but they do carry a proxy_host_id, which silently ranked top_hosts by
 	// error-log volume rather than by attack surface.
 	const base = () => visibleBase(actor, since).whereNot("e.event_type", OPERATIONAL_EVENT_TYPE);
-	const [timeline, topRules, topSources, topHosts, topStatuses, topMethods, newest] = await Promise.all([
+	const [distincts, timeline, topRules, topSources, topHosts, topStatuses, topMethods, newest] = await Promise.all([
+		// The top-N lists stop at ten, so they cannot answer "how many sources in
+		// total" -- which is the headline the findings page leads with.
+		base().first().countDistinct({ distinct_sources: "e.client_ip", distinct_hosts: "e.proxy_host_id" }),
 		base().select("e.event_type", "e.severity").select(databaseFactory().raw("floor(e.occurred_at_ms / 3600000) * 3600000 as bucket_start")).count("e.id as count").groupBy("bucket_start", "e.event_type", "e.severity").orderBy("bucket_start", "asc"),
 		top(base().whereNotNull("e.rule_id"), ["e.rule_id"]), top(base().whereNotNull("e.client_ip"), ["e.client_ip"]), top(base().whereNotNull("e.proxy_host_id"), ["e.proxy_host_id"]), top(base().whereNotNull("e.status"), ["e.status"]), top(base().whereNotNull("e.method"), ["e.method"]),
 		// Collector liveness must consider every kind of record, including the
@@ -216,9 +203,8 @@ const overview = async (access, range) => {
 	const collector = actor.admin
 		? { ...(await databaseFactory()("security_collector_state").first() || { available: false }), enabled: process.env.SECURITY_EVENTS_ENABLED !== "false" }
 		: { available: Boolean(newest?.occurred_at_ms), lag_ms: newest?.occurred_at_ms ? Math.max(0, Date.now() - Number(newest.occurred_at_ms)) : null };
-	const report = { range, total_events: num(totals?.total_events), operational_events: num(totals?.operational_events), exploit_rule_matches: num(totals?.exploit_rule_matches), nginx_errors: num(totals?.operational_events), statuses: { "401": num(totals?.status_401), "403": num(totals?.status_403), "404": num(totals?.status_404), "429": num(totals?.status_429), "5xx": num(totals?.status_5xx) }, timeline: timeline.map((item) => ({ ...item, bucket_start: Number(item.bucket_start), count: num(item.count) })), top_rules: topRules, top_sources: topSources, top_hosts: topHosts, top_statuses: topStatuses, top_methods: topMethods, collector };
-	writeOverviewCache(cacheKey, report);
-	return report;
+	const report = { range, total_events: num(totals?.total_events), operational_events: num(totals?.operational_events), exploit_rule_matches: num(totals?.exploit_rule_matches), nginx_errors: num(totals?.operational_events), distinct_sources: num(distincts?.distinct_sources), distinct_hosts: num(distincts?.distinct_hosts), statuses: { "401": num(totals?.status_401), "403": num(totals?.status_403), "404": num(totals?.status_404), "429": num(totals?.status_429), "5xx": num(totals?.status_5xx) }, timeline: timeline.map((item) => ({ ...item, bucket_start: Number(item.bucket_start), count: num(item.count) })), top_rules: topRules, top_sources: topSources, top_hosts: topHosts, top_statuses: topStatuses, top_methods: topMethods, collector };
+	return overviewCache.write(cacheKey, report);
 };
 const rules = async (access, range) => {
 	const actor = await securityAccess(access, "security:rules");
@@ -351,19 +337,36 @@ const updateRetention = async (access, value) => {
 	return { retention_days: days };
 };
 
+/**
+ * Sibling security modules (security-findings.js) query the same tables behind
+ * the same visibility guard and memoize the same way. They share this module's
+ * database seam rather than opening one of their own, and register their memo
+ * here so that pointing the tests at a different database invalidates every
+ * cached aggregate, not just the overview's.
+ */
+const securityDatabase = () => databaseFactory();
+const registeredCaches = [overviewCache];
+const registerSecurityCache = (memo) => {
+	registeredCaches.push(memo);
+	return memo;
+};
+const clearSecurityCaches = () => {
+	for (const memo of registeredCaches) memo.clear();
+};
+
 /** Test-only seams keep database-backed authorization and filesystem tests isolated. */
 const configureSecurityApiForTesting = ({ database, logDirectory: nextLogDirectory } = {}) => {
 	databaseFactory = database ? () => database : db;
 	if (nextLogDirectory) logDirectory = nextLogDirectory;
 	// Pointing at a different database invalidates anything already memoized.
-	overviewCache.clear();
+	clearSecurityCaches();
 };
 const resetSecurityApiTestState = () => {
 	databaseFactory = db;
 	logDirectory = "/data/logs";
 	requestScans.clear();
-	overviewCache.clear();
+	clearSecurityCaches();
 	activeScans = 0;
 };
 
-export { applyVisibleEvents, authorizeHost, configureSecurityApiForTesting, escapeLike, getEvent, getRetention, listEvents, listLogFiles, literalSearch, overview, readLog, resetSecurityApiTestState, rules, securityAccess, updateRetention, validateEventFilters };
+export { applyVisibleEvents, authorizeHost, configureSecurityApiForTesting, escapeLike, getEvent, getRetention, listEvents, listLogFiles, literalSearch, overview, rangeSince, readLog, registerSecurityCache, resetSecurityApiTestState, rules, securityAccess, securityDatabase, updateRetention, validateEventFilters };

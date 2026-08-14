@@ -125,6 +125,9 @@ describe("security API database-backed authorization and raw-log boundaries", ()
 		assert.equal(report.total_events, 1, "error-log rows must not inflate the security total");
 		assert.equal(report.operational_events, 2);
 		assert.equal(report.timeline.reduce((sum, point) => sum + point.count, 0), 1);
+		// Distinct counts head the overview, and the top-N lists stop at ten, so
+		// they are aggregated separately -- over the security rows only.
+		assert.deepEqual({ sources: report.distinct_sources, hosts: report.distinct_hosts }, { sources: 1, hosts: 1 });
 		// Error-log rows do carry a proxy_host_id, so before this exclusion the
 		// host ranking measured error-log volume rather than attack surface.
 		assert.deepEqual(report.top_hosts, [{ proxy_host_id: 5, count: 1 }]);

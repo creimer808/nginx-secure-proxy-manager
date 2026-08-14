@@ -284,6 +284,9 @@
 		"/security/overview": {
 			"get": { "$ref": "./paths/security/overview-get.json" }
 		},
+		"/security/findings": {
+			"get": { "$ref": "./paths/security/findings-get.json" }
+		},
 		"/security/events": {
 			"get": { "$ref": "./paths/security/get.json" }
 		},
