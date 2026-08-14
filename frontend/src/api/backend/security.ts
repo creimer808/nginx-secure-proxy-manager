@@ -1,5 +1,5 @@
 import * as api from "./base";
-import type { SecurityEvent, SecurityEventFilters, SecurityEventPage, SecurityLogFile, SecurityLogKind, SecurityLogPage, SecurityLogTarget, SecurityOverview, SecurityRange, SecurityRule, SecuritySettings } from "./models";
+import type { SecurityEvent, SecurityEventFilters, SecurityEventPage, SecurityFindingReport, SecurityLogFile, SecurityLogKind, SecurityLogPage, SecurityLogTarget, SecurityOverview, SecurityRange, SecurityRule, SecuritySettings } from "./models";
 
 const controller = (signal?: AbortSignal) => {
 	const value = new AbortController();
@@ -8,6 +8,7 @@ const controller = (signal?: AbortSignal) => {
 };
 
 export const getSecurityOverview = async (range: SecurityRange, signal?: AbortSignal): Promise<SecurityOverview> => api.get({ url: "/security/overview", params: { range } }, controller(signal));
+export const getSecurityFindings = async (range: SecurityRange, signal?: AbortSignal): Promise<SecurityFindingReport> => api.get({ url: "/security/findings", params: { range } }, controller(signal));
 export const getSecurityEvents = async (filters: SecurityEventFilters, signal?: AbortSignal): Promise<SecurityEventPage> => api.get({ url: "/security/events", params: filters as unknown as import("query-string").StringifiableRecord }, controller(signal));
 export const getSecurityEvent = async (eventId: string, signal?: AbortSignal): Promise<SecurityEvent> => api.get({ url: `/security/events/${encodeURIComponent(eventId)}` }, controller(signal));
 export const getSecurityRules = async (range: SecurityRange, signal?: AbortSignal): Promise<SecurityRule[]> => api.get({ url: "/security/rules", params: { range } }, controller(signal));

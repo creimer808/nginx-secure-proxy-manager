@@ -11,6 +11,7 @@ export * from "./useDnsProviders";
 export * from "./useDashboardReport";
 export * from "./useHealth";
 export * from "./useHostReport";
+export * from "./useNoReferrer";
 export * from "./useProxyHost";
 export * from "./useProxyHosts";
 export * from "./useRedirectionHost";

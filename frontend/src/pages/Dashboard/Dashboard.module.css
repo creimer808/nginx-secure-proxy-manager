@@ -10,8 +10,7 @@
 	gap: 1rem;
 }
 
-.headerActions,
-.updating {
+.headerActions, .updating {
 	display: flex;
 	align-items: center;
 }
@@ -88,78 +87,7 @@
 	text-transform: uppercase;
 }
 
-.metricGrid {
-	display: grid;
-	grid-template-columns: repeat(4, minmax(0, 1fr));
-	gap: 0.75rem;
-}
-
-.metricCard {
-	--metric-color: var(--tblr-primary);
-	--metric-rgb: var(--tblr-primary-rgb);
-	position: relative;
-	overflow: hidden;
-}
-
-.metricCard::after {
-	position: absolute;
-	right: 0;
-	bottom: 0;
-	left: 0;
-	height: 2px;
-	background: var(--metric-color);
-	content: "";
-}
-
-.metricBlue {
-	--metric-color: var(--tblr-blue);
-	--metric-rgb: var(--tblr-blue-rgb);
-}
-
-.metricAzure {
-	--metric-color: var(--tblr-azure);
-	--metric-rgb: var(--tblr-azure-rgb);
-}
-
-.metricYellow {
-	--metric-color: var(--tblr-yellow);
-	--metric-rgb: var(--tblr-yellow-rgb);
-}
-
-.metricRed {
-	--metric-color: var(--tblr-red);
-	--metric-rgb: var(--tblr-red-rgb);
-}
-
-.metricValue {
-	margin-top: 0.25rem;
-	font-size: 1.625rem;
-	font-weight: 600;
-	font-variant-numeric: tabular-nums;
-	letter-spacing: -0.025em;
-	line-height: 1.2;
-}
-
-.metricIcon {
-	display: inline-flex;
-	flex: 0 0 auto;
-	align-items: center;
-	justify-content: center;
-	width: 2.5rem;
-	height: 2.5rem;
-	border-radius: var(--tblr-border-radius);
-	background: rgba(var(--metric-rgb), 0.12);
-	color: var(--metric-color);
-}
-
-.metricIcon svg {
-	width: 1.25rem;
-	height: 1.25rem;
-	stroke-width: 1.8;
-}
-
-.insightsGrid,
-.tablesGrid {
+.insightsGrid, .tablesGrid {
 	display: grid;
 	align-items: stretch;
 	gap: 1rem;
@@ -173,126 +101,8 @@
 	grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
 }
 
-.insightsGrid > .card,
-.tablesGrid > .card {
+.insightsGrid > .card, .tablesGrid > .card {
 	min-width: 0;
-}
-
-.chartBody {
-	display: flex;
-	flex-direction: column;
-	min-height: 20rem;
-}
-
-.chartPlot {
-	position: relative;
-	height: 13.5rem;
-	min-height: 13.5rem;
-	overflow: hidden;
-}
-
-.chartGrid {
-	position: absolute;
-	inset: 0;
-	background-image: repeating-linear-gradient(
-		to bottom,
-		transparent 0,
-		transparent calc(25% - 1px),
-		var(--tblr-border-color-translucent) 25%
-	);
-	border-bottom: var(--tblr-border-width) solid var(--tblr-border-color);
-	pointer-events: none;
-}
-
-.chart {
-	position: absolute;
-	inset: 0;
-	display: flex;
-	align-items: flex-end;
-	gap: clamp(2px, 0.4vw, 5px);
-	padding: 0 0.25rem;
-}
-
-.bar {
-	z-index: 1;
-	display: flex;
-	flex: 1 1 0;
-	flex-direction: column-reverse;
-	min-width: 3px;
-	overflow: hidden;
-	border-radius: 2px 2px 0 0;
-	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
-	transition: filter 120ms ease;
-}
-
-.bar:hover {
-	filter: brightness(1.08);
-}
-
-.bar2xx {
-	background: var(--tblr-green);
-}
-
-.bar3xx {
-	background: var(--tblr-azure);
-}
-
-.bar4xx {
-	background: var(--tblr-yellow);
-}
-
-.bar5xx {
-	background: var(--tblr-red);
-}
-
-.bar1xx {
-	background: var(--tblr-secondary);
-}
-
-.chartLabels {
-	display: grid;
-	grid-auto-columns: minmax(0, 1fr);
-	grid-auto-flow: column;
-	min-height: 1.5rem;
-	padding: 0.35rem 0.25rem 0;
-	color: var(--tblr-secondary);
-	font-size: 0.6875rem;
-}
-
-.chartLabels span {
-	text-align: center;
-	white-space: nowrap;
-}
-
-.chartLabels span:first-child {
-	text-align: left;
-}
-
-.chartLabels span:last-child {
-	text-align: right;
-}
-
-.legend {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 0.4rem 0.9rem;
-	margin-top: auto;
-	padding-top: 0.75rem;
-	font-size: 0.75rem;
-}
-
-.legendItem {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.35rem;
-	white-space: nowrap;
-}
-
-.legendSwatch {
-	display: inline-block;
-	width: 0.625rem;
-	height: 0.625rem;
-	border-radius: 2px;
 }
 
 .postureNote {
@@ -387,71 +197,35 @@
 	margin-left: 0.75rem;
 }
 
-.srOnly {
-	position: absolute;
-	width: 1px;
-	height: 1px;
-	padding: 0;
-	margin: -1px;
-	overflow: hidden;
-	clip: rect(0, 0, 0, 0);
-	white-space: nowrap;
-	border: 0;
-}
-
-@media (max-width: 991.98px) {
-	.metricGrid {
-		grid-template-columns: repeat(2, minmax(0, 1fr));
-	}
-
-	.insightsGrid,
-	.tablesGrid {
+@media (max-width: 991.98px) {.insightsGrid, .tablesGrid {
 		grid-template-columns: minmax(0, 1fr);
 	}
 }
 
-@media (max-width: 575.98px) {
-	.dashboardHeader {
+@media (max-width: 575.98px) {.dashboardHeader {
 		align-items: stretch;
 		flex-direction: column;
 	}
 
-	.headerActions {
+.headerActions {
 		align-items: stretch;
 		justify-content: space-between;
 	}
 
-	.rangeGroup {
+.rangeGroup {
 		width: 100%;
 	}
 
-	.rangeButton {
+.rangeButton {
 		flex: 1 1 0;
 	}
 
-	.metricGrid,
-	.postureList {
+.postureList {
 		grid-template-columns: minmax(0, 1fr);
 	}
 
-	.postureList > div:nth-child(odd),
-	.postureList > div:nth-last-child(2) {
+.postureList > div:nth-child(odd), .postureList > div:nth-last-child(2) {
 		border-right: 0;
 		border-bottom: var(--tblr-border-width) solid var(--tblr-border-color);
-	}
-
-	.chartBody {
-		min-height: 16.5rem;
-	}
-
-	.chartPlot {
-		height: 10rem;
-		min-height: 10rem;
-	}
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.bar {
-		transition: none;
 	}
 }

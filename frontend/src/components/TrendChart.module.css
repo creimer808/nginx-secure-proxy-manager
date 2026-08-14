@@ -1,0 +1,161 @@
+.chartBody {
+	display: flex;
+	flex-direction: column;
+	min-height: 20rem;
+}
+
+.chartPlot {
+	position: relative;
+	height: 13.5rem;
+	min-height: 13.5rem;
+	overflow: hidden;
+}
+
+.chartGrid {
+	position: absolute;
+	inset: 0;
+	background-image: repeating-linear-gradient(
+		to bottom,
+		transparent 0,
+		transparent calc(25% - 1px),
+		var(--tblr-border-color-translucent) 25%
+	);
+	border-bottom: var(--tblr-border-width) solid var(--tblr-border-color);
+	pointer-events: none;
+}
+
+.chart {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: flex-end;
+	gap: clamp(2px, 0.4vw, 5px);
+	padding: 0 0.25rem;
+}
+
+.bar {
+	z-index: 1;
+	display: flex;
+	flex: 1 1 0;
+	flex-direction: column-reverse;
+	min-width: 3px;
+	overflow: hidden;
+	border-radius: 2px 2px 0 0;
+	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+	transition: filter 120ms ease;
+}
+
+.bar:hover {
+	filter: brightness(1.08);
+}
+
+.toneSecondary {
+	background: var(--tblr-secondary);
+}
+
+.toneGreen {
+	background: var(--tblr-green);
+}
+
+.toneAzure {
+	background: var(--tblr-azure);
+}
+
+.toneYellow {
+	background: var(--tblr-yellow);
+}
+
+.toneOrange {
+	background: var(--tblr-orange);
+}
+
+.toneRed {
+	background: var(--tblr-red);
+}
+
+.chartLabels {
+	display: grid;
+	grid-auto-columns: minmax(0, 1fr);
+	grid-auto-flow: column;
+	min-height: 1.5rem;
+	padding: 0.35rem 0.25rem 0;
+	color: var(--tblr-secondary);
+	font-size: 0.6875rem;
+}
+
+.chartLabels span {
+	text-align: center;
+	white-space: nowrap;
+}
+
+.chartLabels span:first-child {
+	text-align: left;
+}
+
+.chartLabels span:last-child {
+	text-align: right;
+}
+
+.legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem 0.9rem;
+	margin-top: auto;
+	padding-top: 0.75rem;
+	font-size: 0.75rem;
+}
+
+.legendItem {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+	white-space: nowrap;
+}
+
+.legendSwatch {
+	display: inline-block;
+	width: 0.625rem;
+	height: 0.625rem;
+	border-radius: 2px;
+}
+
+.note {
+	margin-bottom: 0;
+	color: var(--tblr-secondary);
+	font-size: 0.875rem;
+}
+
+/* The chart carries meaning in colour alone, so the same data is published as
+   a table for assistive technology. Visually hidden, not display:none. */
+.srOnly {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	border: 0;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.bar {
+		transition: none;
+	}
+}
+
+@media (max-width: 62rem) {
+	.chartBody {
+		min-height: 0;
+	}
+
+	.chartPlot {
+		height: 10rem;
+		min-height: 10rem;
+	}
+
+	.bar {
+		min-width: 2px;
+	}
+}

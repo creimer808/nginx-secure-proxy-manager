@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import type { DashboardReport } from "src/api/backend";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -8,7 +9,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("src/api/backend", async () => {
 	const actual = await vi.importActual<typeof import("src/api/backend")>("src/api/backend");
 	const getDashboardReport = vi.fn();
-	return { ...actual, getDashboardReport };
+	// The open-findings tile reads a different endpoint; this suite is about the
+	// traffic report, so the findings read is stubbed empty rather than exercised.
+	const getSecurityFindings = vi.fn().mockResolvedValue({ range: "24h", generatedAt: 0, window: { from: 0, to: 0 }, counts: { low: 0, medium: 0, high: 0, critical: 0 }, truncated: false, findings: [] });
+	return { ...actual, getDashboardReport, getSecurityFindings };
 });
 
 const { getDashboardReport } = await import("src/api/backend");
@@ -84,7 +88,9 @@ const renderWithClient = () => {
 		queryClient,
 		...render(
 			<QueryClientProvider client={queryClient}>
-				<SecurityTrafficDashboard />
+				<MemoryRouter>
+					<SecurityTrafficDashboard />
+				</MemoryRouter>
 			</QueryClientProvider>,
 		),
 	};

@@ -1,35 +1,15 @@
-import { IconActivity, IconAlertTriangle, IconDatabaseExport, IconServerOff } from "@tabler/icons-react";
+import { IconActivity, IconAlertTriangle, IconDatabaseExport, IconServerOff, IconShieldSearch } from "@tabler/icons-react";
 import cn from "classnames";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import type { DashboardRange, DashboardReport, DashboardSeriesPoint } from "src/api/backend";
-import { Button, Loading } from "src/components";
-import { useDashboardReport } from "src/hooks";
+import { Button, Loading, MetricCard, MetricGrid, TrendChart, type TrendSeriesKey } from "src/components";
+import { useDashboardReport, useSecurityFindings } from "src/hooks";
 import { getLocale, T } from "src/locale";
+import { formatBytes, formatNumber } from "src/modules/Format";
 import styles from "./Dashboard.module.css";
 
 const RANGES: DashboardRange[] = ["24h", "7d", "30d"];
-
-const formatNumber = (value: number): string => {
-	try {
-		return new Intl.NumberFormat(getLocale()).format(value);
-	} catch {
-		return String(value);
-	}
-};
-
-const formatBytes = (bytes: number): string => {
-	if (!bytes) {
-		return "0 B";
-	}
-	const units = ["B", "KB", "MB", "GB", "TB"];
-	const i = Math.min(units.length - 1, Math.floor(Math.log(bytes) / Math.log(1024)));
-	const value = bytes / 1024 ** i;
-	try {
-		return `${new Intl.NumberFormat(getLocale(), { maximumFractionDigits: 1 }).format(value)} ${units[i]}`;
-	} catch {
-		return `${value} ${units[i]}`;
-	}
-};
 
 const formatBucketLabel = (bucketStart: number, range: DashboardRange): string => {
 	try {
@@ -41,9 +21,6 @@ const formatBucketLabel = (bucketStart: number, range: DashboardRange): string =
 		return String(bucketStart);
 	}
 };
-
-const maxSeriesRequests = (series: DashboardSeriesPoint[]): number =>
-	series.reduce((max, point) => Math.max(max, point.requestCount), 0);
 
 const RANGE_BUCKETS: Record<DashboardRange, { count: number; seconds: number }> = {
 	"24h": { count: 24, seconds: 60 * 60 },
@@ -97,7 +74,11 @@ const SecurityTrafficDashboard = () => {
 					<h3 id="security-traffic-heading" className="mb-0">
 						<T id="dashboard.metrics.title" />
 					</h3>
-					<a href="/security" className="small"><T id="dashboard.metrics.open-security" /></a>
+					{/* A router link, not an anchor: the anchor here threw away the whole
+					    SPA and reloaded the application just to change page. */}
+					<Link to="/security" className="small">
+						<T id="dashboard.metrics.open-security" />
+					</Link>
 				</div>
 				<div className={styles.headerActions}>
 					{isFetching && !isLoading && (
@@ -194,6 +175,30 @@ interface SectionProps {
 	report: DashboardReport;
 }
 
+/**
+ * Findings are computed over the security event tables rather than the traffic
+ * aggregates, so this tile is its own query. It is deliberately quiet when the
+ * request fails: a missing findings count must not take the traffic dashboard
+ * down with it.
+ */
+const OpenFindings = ({ range }: { range: DashboardRange }) => {
+	const { data } = useSecurityFindings(range);
+	if (!data) {
+		return null;
+	}
+	const urgent = data.counts.critical + data.counts.high;
+	return (
+		<MetricCard
+			label={<T id="dashboard.metrics.open-findings" />}
+			value={formatNumber(data.findings.length)}
+			hint={urgent ? <T id="dashboard.metrics.urgent-findings" data={{ count: urgent }} /> : undefined}
+			icon={<IconShieldSearch aria-hidden="true" />}
+			tone={urgent ? "orange" : "green"}
+			to="/security"
+		/>
+	);
+};
+
 const Summary = ({ report }: SectionProps) => {
 	const { traffic } = report;
 	return (
@@ -201,7 +206,7 @@ const Summary = ({ report }: SectionProps) => {
 			<h4 id="metrics-summary-heading" className={styles.sectionLabel}>
 				<T id="dashboard.metrics.summary" />
 			</h4>
-			<div className={styles.metricGrid}>
+			<MetricGrid>
 				<MetricCard
 					label={<T id="dashboard.metrics.requests" />}
 					value={formatNumber(traffic.requests)}
@@ -226,172 +231,42 @@ const Summary = ({ report }: SectionProps) => {
 					icon={<IconServerOff aria-hidden="true" />}
 					tone="red"
 				/>
-			</div>
+				<OpenFindings range={report.range} />
+			</MetricGrid>
 		</section>
 	);
 };
 
-interface MetricCardProps {
-	label: React.ReactNode;
-	value: string;
-	icon: React.ReactNode;
-	tone: "blue" | "azure" | "yellow" | "red";
-}
+const TREND_SERIES: TrendSeriesKey[] = [
+	{ id: "status1xx", tone: "secondary", label: <T id="dashboard.metrics.status-1xx" />, shortLabel: "1xx" },
+	{ id: "status2xx", tone: "green", label: <T id="dashboard.metrics.status-2xx" />, shortLabel: "2xx" },
+	{ id: "status3xx", tone: "azure", label: <T id="dashboard.metrics.status-3xx" />, shortLabel: "3xx" },
+	{ id: "status4xx", tone: "yellow", label: <T id="dashboard.metrics.status-4xx" />, shortLabel: "4xx" },
+	{ id: "status5xx", tone: "red", label: <T id="dashboard.metrics.status-5xx" />, shortLabel: "5xx" },
+];
 
-const METRIC_TONES = {
-	blue: styles.metricBlue,
-	azure: styles.metricAzure,
-	yellow: styles.metricYellow,
-	red: styles.metricRed,
-};
-
-const MetricCard = ({ label, value, icon, tone }: MetricCardProps) => (
-	<div className={cn("card", styles.metricCard, METRIC_TONES[tone])}>
-		<div className="card-body">
-			<div className="d-flex align-items-start justify-content-between gap-3">
-				<div className="min-w-0">
-					<div className="subheader">{label}</div>
-					<div className={styles.metricValue}>{value}</div>
-				</div>
-				<span className={styles.metricIcon}>{icon}</span>
-			</div>
-		</div>
-	</div>
-);
-
-const Trend = ({ series, range }: { series: DashboardSeriesPoint[]; range: DashboardRange }) => {
-	const max = maxSeriesRequests(series);
-	const labelIndexes = new Set([0, Math.floor((series.length - 1) / 2), series.length - 1]);
-
-	return (
-		<section className="card" aria-labelledby="metrics-trend-heading">
-			<div className="card-header">
-				<h4 id="metrics-trend-heading" className="card-title">
-					<T id="dashboard.metrics.trend" />
-				</h4>
-			</div>
-			<div className={cn("card-body", styles.chartBody)}>
-				{series.length === 0 ? (
-					<p className={styles.note}>
-						<T id="dashboard.metrics.no-data" />
-					</p>
-				) : (
-					<>
-						<div className={styles.chartPlot}>
-							<div className={styles.chartGrid} aria-hidden="true" />
-							<div
-								className={styles.chart}
-								role="img"
-								aria-labelledby="metrics-trend-heading"
-								data-range={range}
-							>
-								{series.map((point) => {
-									const total = Math.max(1, point.requestCount);
-									const heightPct = max > 0 ? (point.requestCount / max) * 100 : 0;
-									return (
-										<div
-											key={point.bucketStart}
-											className={styles.bar}
-											style={{ height: `${heightPct}%` }}
-											title={`${formatBucketLabel(point.bucketStart, range)}: ${formatNumber(point.requestCount)}`}
-										>
-											{point.status2xx > 0 && (
-												<div
-													className={styles.bar2xx}
-													style={{ height: `${(point.status2xx / total) * 100}%` }}
-												/>
-											)}
-											{point.status3xx > 0 && (
-												<div
-													className={styles.bar3xx}
-													style={{ height: `${(point.status3xx / total) * 100}%` }}
-												/>
-											)}
-											{point.status4xx > 0 && (
-												<div
-													className={styles.bar4xx}
-													style={{ height: `${(point.status4xx / total) * 100}%` }}
-												/>
-											)}
-											{point.status5xx > 0 && (
-												<div
-													className={styles.bar5xx}
-													style={{ height: `${(point.status5xx / total) * 100}%` }}
-												/>
-											)}
-											{point.status1xx > 0 && (
-												<div
-													className={styles.bar1xx}
-													style={{ height: `${(point.status1xx / total) * 100}%` }}
-												/>
-											)}
-										</div>
-									);
-								})}
-							</div>
-						</div>
-						<div className={styles.chartLabels} aria-hidden="true">
-							{series.map((point, index) => (
-								<span key={point.bucketStart}>
-									{labelIndexes.has(index) ? formatBucketLabel(point.bucketStart, range) : ""}
-								</span>
-							))}
-						</div>
-						<div className={styles.legend}>
-							<LegendItem className={styles.bar1xx} id="dashboard.metrics.status-1xx" />
-							<LegendItem className={styles.bar2xx} id="dashboard.metrics.status-2xx" />
-							<LegendItem className={styles.bar3xx} id="dashboard.metrics.status-3xx" />
-							<LegendItem className={styles.bar4xx} id="dashboard.metrics.status-4xx" />
-							<LegendItem className={styles.bar5xx} id="dashboard.metrics.status-5xx" />
-						</div>
-						{/* This table communicates the chart data without relying on color. */}
-						<div className={styles.srOnly}>
-							<table>
-								<caption>
-									<T id="dashboard.metrics.trend" />
-								</caption>
-								<thead>
-									<tr>
-										<th scope="col">
-											<T id="dashboard.metrics.bucket" />
-										</th>
-										<th scope="col">
-											<T id="dashboard.metrics.requests" />
-										</th>
-										<th scope="col">1xx</th>
-										<th scope="col">2xx</th>
-										<th scope="col">3xx</th>
-										<th scope="col">4xx</th>
-										<th scope="col">5xx</th>
-									</tr>
-								</thead>
-								<tbody>
-									{series.map((point) => (
-										<tr key={point.bucketStart}>
-											<td>{formatBucketLabel(point.bucketStart, range)}</td>
-											<td>{point.requestCount}</td>
-											<td>{point.status1xx}</td>
-											<td>{point.status2xx}</td>
-											<td>{point.status3xx}</td>
-											<td>{point.status4xx}</td>
-											<td>{point.status5xx}</td>
-										</tr>
-									))}
-								</tbody>
-							</table>
-						</div>
-					</>
-				)}
-			</div>
-		</section>
-	);
-};
-
-const LegendItem = ({ className, id }: { className: string; id: string }) => (
-	<span className={styles.legendItem}>
-		<span className={cn(styles.legendSwatch, className)} aria-hidden="true" />
-		<T id={id} />
-	</span>
+const Trend = ({ series, range }: { series: DashboardSeriesPoint[]; range: DashboardRange }) => (
+	<TrendChart
+		headingId="metrics-trend-heading"
+		title={<T id="dashboard.metrics.trend" />}
+		series={TREND_SERIES}
+		buckets={series.map((point) => ({
+			key: point.bucketStart,
+			label: formatBucketLabel(point.bucketStart, range),
+			total: point.requestCount,
+			values: {
+				status1xx: point.status1xx,
+				status2xx: point.status2xx,
+				status3xx: point.status3xx,
+				status4xx: point.status4xx,
+				status5xx: point.status5xx,
+			},
+		}))}
+		range={range}
+		emptyLabel={<T id="dashboard.metrics.no-data" />}
+		bucketHeading={<T id="dashboard.metrics.bucket" />}
+		totalHeading={<T id="dashboard.metrics.requests" />}
+	/>
 );
 
 const POSTURE_ROWS: { key: keyof DashboardReport["posture"]; id: string }[] = [
