@@ -156,6 +156,35 @@ const getEvent = async (access, eventId) => {
 	return normalizeEventNumbers(row);
 };
 
+/**
+ * overview() runs eight aggregate queries over a table with no upper bound, and
+ * the page polls it. What it returns is a 24-hour-to-30-day rollup, so serving
+ * one a few seconds stale costs nothing, while re-deriving it on every refresh
+ * scans the event table eight more times. Collector lag is reported from the
+ * same snapshot and is therefore also up to one TTL behind.
+ */
+const OVERVIEW_CACHE_TTL_MS = 30_000;
+const OVERVIEW_CACHE_MAX_ENTRIES = 200;
+const overviewCache = new Map();
+// Every input that changes the result: who is asking, what they can see, and
+// over what window.
+const overviewCacheKey = (actor, range) => JSON.stringify([actor.admin, actor.visibility, actor.userId, range]);
+const readOverviewCache = (key) => {
+	const entry = overviewCache.get(key);
+	if (!entry) return null;
+	if (entry.expiresAt <= Date.now()) {
+		overviewCache.delete(key);
+		return null;
+	}
+	return entry.value;
+};
+const writeOverviewCache = (key, value) => {
+	// Bounded so a large user population cannot grow this without limit. Map
+	// iterates in insertion order, so this evicts the oldest entry.
+	if (overviewCache.size >= OVERVIEW_CACHE_MAX_ENTRIES) overviewCache.delete(overviewCache.keys().next().value);
+	overviewCache.set(key, { value, expiresAt: Date.now() + OVERVIEW_CACHE_TTL_MS });
+};
+
 const rangeSince = (range) => {
 	if (!["24h", "7d", "30d"].includes(range)) throw new errs.ValidationError("Invalid range");
 	return Date.now() - ({ "24h": 86400000, "7d": 7 * 86400000, "30d": 30 * 86400000 }[range]);
@@ -164,7 +193,12 @@ const visibleBase = (actor, since) => applyVisibleEvents(databaseFactory()("secu
 const top = async (query, fields, order = "count") => (await query.select(fields).count("e.id as count").groupBy(fields).orderBy(order, "desc").limit(10)).map((row) => ({ ...row, count: Number(row.count) }));
 const overview = async (access, range) => {
 	const actor = await securityAccess(access, "security:overview");
+	// Authorization and range validation stay ahead of the cache, so neither a
+	// revoked permission nor a bad range can be served from it.
 	const since = rangeSince(range);
+	const cacheKey = overviewCacheKey(actor, range);
+	const cached = readOverviewCache(cacheKey);
+	if (cached) return cached;
 	const totals = await visibleBase(actor, since).first().sum({ total_events: databaseFactory().raw("case when e.event_type <> 'nginx_error' then 1 else 0 end"), operational_events: databaseFactory().raw("case when e.event_type = 'nginx_error' then 1 else 0 end"), exploit_rule_matches: databaseFactory().raw("case when e.event_type = 'exploit_rule' then 1 else 0 end"), status_401: databaseFactory().raw("case when e.status = 401 then 1 else 0 end"), status_403: databaseFactory().raw("case when e.status = 403 then 1 else 0 end"), status_404: databaseFactory().raw("case when e.status = 404 then 1 else 0 end"), status_429: databaseFactory().raw("case when e.status = 429 then 1 else 0 end"), status_5xx: databaseFactory().raw("case when e.status >= 500 then 1 else 0 end") });
 	// Every aggregate below is a *security* view. Error-log rows carry no client
 	// IP, status, method or rule, so most top-N lists already skipped them --
@@ -182,7 +216,9 @@ const overview = async (access, range) => {
 	const collector = actor.admin
 		? { ...(await databaseFactory()("security_collector_state").first() || { available: false }), enabled: process.env.SECURITY_EVENTS_ENABLED !== "false" }
 		: { available: Boolean(newest?.occurred_at_ms), lag_ms: newest?.occurred_at_ms ? Math.max(0, Date.now() - Number(newest.occurred_at_ms)) : null };
-	return { range, total_events: num(totals?.total_events), operational_events: num(totals?.operational_events), exploit_rule_matches: num(totals?.exploit_rule_matches), nginx_errors: num(totals?.operational_events), statuses: { "401": num(totals?.status_401), "403": num(totals?.status_403), "404": num(totals?.status_404), "429": num(totals?.status_429), "5xx": num(totals?.status_5xx) }, timeline: timeline.map((item) => ({ ...item, bucket_start: Number(item.bucket_start), count: num(item.count) })), top_rules: topRules, top_sources: topSources, top_hosts: topHosts, top_statuses: topStatuses, top_methods: topMethods, collector };
+	const report = { range, total_events: num(totals?.total_events), operational_events: num(totals?.operational_events), exploit_rule_matches: num(totals?.exploit_rule_matches), nginx_errors: num(totals?.operational_events), statuses: { "401": num(totals?.status_401), "403": num(totals?.status_403), "404": num(totals?.status_404), "429": num(totals?.status_429), "5xx": num(totals?.status_5xx) }, timeline: timeline.map((item) => ({ ...item, bucket_start: Number(item.bucket_start), count: num(item.count) })), top_rules: topRules, top_sources: topSources, top_hosts: topHosts, top_statuses: topStatuses, top_methods: topMethods, collector };
+	writeOverviewCache(cacheKey, report);
+	return report;
 };
 const rules = async (access, range) => {
 	const actor = await securityAccess(access, "security:rules");
@@ -319,11 +355,14 @@ const updateRetention = async (access, value) => {
 const configureSecurityApiForTesting = ({ database, logDirectory: nextLogDirectory } = {}) => {
 	databaseFactory = database ? () => database : db;
 	if (nextLogDirectory) logDirectory = nextLogDirectory;
+	// Pointing at a different database invalidates anything already memoized.
+	overviewCache.clear();
 };
 const resetSecurityApiTestState = () => {
 	databaseFactory = db;
 	logDirectory = "/data/logs";
 	requestScans.clear();
+	overviewCache.clear();
 	activeScans = 0;
 };
 

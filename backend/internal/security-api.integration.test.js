@@ -130,6 +130,24 @@ describe("security API database-backed authorization and raw-log boundaries", ()
 		assert.deepEqual(report.top_hosts, [{ proxy_host_id: 5, count: 1 }]);
 	});
 
+	it("serves the overview from a short-lived memo without caching the authorization decision", async () => {
+		await insertHost(6, 60);
+		const observation = { proxy_host_id: 6, event_type: "http_status", severity: "low", status: 404 };
+		await database("security_event").insert([event({ ...observation, id: 20, event_id: "event-00000000000020", ingest_line_offset: 20 })]);
+		const actor = access({ userId: 60 });
+		assert.equal((await overview(actor, "24h")).total_events, 1);
+
+		await database("security_event").insert([event({ ...observation, id: 21, event_id: "event-00000000000021", ingest_line_offset: 21 })]);
+		assert.equal((await overview(actor, "24h")).total_events, 1, "a repeat inside the TTL must not re-run the aggregates");
+		// A different window is a different question, so it is a different entry.
+		assert.equal((await overview(actor, "7d")).total_events, 2);
+
+		// Whether the caller may ask at all, and whether the range is valid, are
+		// both settled before the memo is consulted.
+		await assert.rejects(() => overview(access({ userId: 60, allowed: false }), "24h"), { status: 403 });
+		await assert.rejects(() => overview(actor, "90d"), { status: 400 });
+	});
+
 	it("resolves only authorized allowlisted raw files and prevents global, symlink, hardlink, rotation, and cursor bypasses", async () => {
 		await insertHost(9, 10);
 		fs.writeFileSync(path.join(logDirectory, "proxy-host-9_security.log"), "one\ntwo\nthree\n");
