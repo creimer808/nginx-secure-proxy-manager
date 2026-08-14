@@ -29,6 +29,8 @@ const mapBody = (targetVariable) => {
 	assert.ok(match, `security-rules.conf defines no map for $${targetVariable}`);
 	return match[1];
 };
+/** Every map that can produce a rule id. A new one added here and nowhere else fails the catalog check. */
+const DETECTION_MAPS = ["security_query_rule_id", "security_user_agent_rule_id", "security_uri_rule_id", "security_scanner_rule_id", "security_referer_rule_id"];
 /** Rule ids are the map *values*: the token immediately before the terminating semicolon. */
 const ruleIdsIn = (body) => (body.match(/([a-z][a-z0-9-]*\.[a-z0-9-]+);/g) || []).map((entry) => entry.slice(0, -1));
 /** `~^sql\.  sql;` => sql -> sql */
@@ -38,7 +40,7 @@ const categoryByPrefix = new Map(
 
 describe("security attribution Nginx contract", () => {
 	it("keeps the JavaScript rule catalog identical to the Nginx ruleset", () => {
-		const detected = [...new Set([...ruleIdsIn(mapBody("security_query_rule_id")), ...ruleIdsIn(mapBody("security_user_agent_rule_id"))])];
+		const detected = [...new Set(DETECTION_MAPS.flatMap((name) => ruleIdsIn(mapBody(name))))];
 		assert.deepEqual(detected.slice().sort(), SECURITY_RULES.map((rule) => rule.id).sort(), "rule ids differ between security-rules.conf and security-rule-catalog.js");
 
 		// A rule whose prefix has no category entry silently logs an empty
@@ -60,7 +62,15 @@ describe("security attribution Nginx contract", () => {
 		const userAgentMap = rules.indexOf("map $http_user_agent $security_user_agent_rule_id");
 		assert.ok(queryMap < sqlFirst && sqlFirst < sqlSecond);
 		assert.ok(queryMap < userAgentMap);
-		assert.match(rules, /map \$security_query_rule_id \$security_detected_rule_id \{\s*""\s+\$security_user_agent_rule_id;\s*default \$security_query_rule_id;/);
+		assert.match(mapBody("security_legacy_rule_id"), /""\s+\$security_user_agent_rule_id;\s*default \$security_query_rule_id;/);
+	});
+
+	it("resolves a legacy signature ahead of anything added since", () => {
+		// $request_uri contains the query string, so a legacy query signature and
+		// a modern path rule can match the same request. The legacy id has to win:
+		// it is the one block-exploits.conf acts on, so losing that race would
+		// silently stop blocking a request that used to be blocked.
+		assert.match(mapBody("security_detected_rule_id"), /""\s+\$security_modern_rule_id;\s*default \$security_legacy_rule_id;/);
 	});
 
 	it("keeps legacy and default-server blocking enabled through the include", () => {

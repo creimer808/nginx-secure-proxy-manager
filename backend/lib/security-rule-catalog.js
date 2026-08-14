@@ -28,7 +28,7 @@ const RULE_ACTION_DETECT = "detect";
  * against the ruleset that produced it. The .conf carries the same literal and
  * the contract test keeps the two in step.
  */
-const RULESET_VERSION = "2026-08-13";
+const RULESET_VERSION = "2026-08-14";
 
 /** @type {{id: string, category: string, action: string, description: string}[]} */
 const SECURITY_RULES = [
@@ -58,6 +58,38 @@ const SECURITY_RULES = [
 	{ id: "ua.go-ahead-got-it", category: "user-agent", action: RULE_ACTION_BLOCK, description: "Go-Ahead-Got-It user agent" },
 	{ id: "ua.turnitinbot", category: "user-agent", action: RULE_ACTION_BLOCK, description: "TurnitinBot user agent" },
 	{ id: "ua.grabnet", category: "user-agent", action: RULE_ACTION_BLOCK, description: "GrabNet user agent" },
+
+	// --- Detect-only. Never changes a response. ---
+	{ id: "inject.log4shell", category: "injection", action: RULE_ACTION_DETECT, description: "JNDI lookup payload (Log4Shell) in the URI, user agent, or referrer" },
+	{ id: "inject.spring4shell", category: "injection", action: RULE_ACTION_DETECT, description: "Spring class loader manipulation (Spring4Shell)" },
+	{ id: "path.dotenv", category: "path-probe", action: RULE_ACTION_DETECT, description: "Request for a .env environment file" },
+	{ id: "path.git-config", category: "path-probe", action: RULE_ACTION_DETECT, description: "Request into an exposed .git directory" },
+	{ id: "path.svn", category: "path-probe", action: RULE_ACTION_DETECT, description: "Request into an exposed .svn directory" },
+	{ id: "path.cloud-credentials", category: "path-probe", action: RULE_ACTION_DETECT, description: "Request for .aws credential files" },
+	{ id: "path.cloud-metadata", category: "path-probe", action: RULE_ACTION_DETECT, description: "Cloud instance metadata path, typically an SSRF attempt" },
+	{ id: "path.etc-passwd", category: "path-probe", action: RULE_ACTION_DETECT, description: "Request for /etc/passwd or /etc/shadow" },
+	{ id: "path.traversal", category: "path-probe", action: RULE_ACTION_DETECT, description: "Directory traversal sequence in the path, encoded or literal" },
+	{ id: "path.wp-login", category: "path-probe", action: RULE_ACTION_DETECT, description: "WordPress login probe" },
+	{ id: "path.wp-admin", category: "path-probe", action: RULE_ACTION_DETECT, description: "WordPress admin probe" },
+	{ id: "path.xmlrpc", category: "path-probe", action: RULE_ACTION_DETECT, description: "WordPress xmlrpc.php probe" },
+	{ id: "path.phpmyadmin", category: "path-probe", action: RULE_ACTION_DETECT, description: "phpMyAdmin probe" },
+	{ id: "path.adminer", category: "path-probe", action: RULE_ACTION_DETECT, description: "Adminer database console probe" },
+	{ id: "path.actuator", category: "path-probe", action: RULE_ACTION_DETECT, description: "Spring Boot Actuator endpoint probe" },
+	{ id: "path.phpunit", category: "path-probe", action: RULE_ACTION_DETECT, description: "Vendored PHPUnit remote-execution probe" },
+	{ id: "path.cgi-bin", category: "path-probe", action: RULE_ACTION_DETECT, description: "CGI executable directory probe" },
+	{ id: "path.webshell", category: "path-probe", action: RULE_ACTION_DETECT, description: "Known web shell filename" },
+	{ id: "path.exchange", category: "path-probe", action: RULE_ACTION_DETECT, description: "Exchange autodiscover/OWA/ECP probe" },
+	{ id: "path.solr", category: "path-probe", action: RULE_ACTION_DETECT, description: "Apache Solr admin probe" },
+	{ id: "path.config-backup", category: "path-probe", action: RULE_ACTION_DETECT, description: "Request for a .sql, .bak, .old, or .swp file" },
+	{ id: "scanner.nuclei", category: "scanner", action: RULE_ACTION_DETECT, description: "Nuclei scanner user agent" },
+	{ id: "scanner.sqlmap", category: "scanner", action: RULE_ACTION_DETECT, description: "sqlmap user agent" },
+	{ id: "scanner.nikto", category: "scanner", action: RULE_ACTION_DETECT, description: "Nikto scanner user agent" },
+	{ id: "scanner.masscan", category: "scanner", action: RULE_ACTION_DETECT, description: "masscan user agent" },
+	{ id: "scanner.zgrab", category: "scanner", action: RULE_ACTION_DETECT, description: "zgrab banner grabber user agent" },
+	{ id: "scanner.nmap", category: "scanner", action: RULE_ACTION_DETECT, description: "Nmap NSE user agent" },
+	{ id: "scanner.wpscan", category: "scanner", action: RULE_ACTION_DETECT, description: "WPScan user agent" },
+	{ id: "scanner.directory-brute", category: "scanner", action: RULE_ACTION_DETECT, description: "Directory brute-forcing tool user agent" },
+	{ id: "scanner.internet-survey", category: "scanner", action: RULE_ACTION_DETECT, description: "Internet-wide survey crawler user agent" },
 ];
 
 /** Every rule prefix the parser and API will accept, derived rather than restated. */

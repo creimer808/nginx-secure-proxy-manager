@@ -58,6 +58,8 @@ describe("security event parser", () => {
 	it("refuses an attribution that claims an enforcement it could not have performed", () => {
 		// A record is only as trustworthy as the file it came from, so a claimed
 		// block must carry the 403 it caused and the severity that goes with it.
+		// A detect-only rule cannot have blocked anything, whatever the line claims.
+		assert.throws(() => parseSecurityAccessLine(JSON.stringify(payload({ rule_id: "path.dotenv", rule_category: "path-probe", rule_action: "block", status: "403", severity: "high" })), context), /exploit attribution/);
 		assert.throws(() => parseSecurityAccessLine(JSON.stringify(payload({ status: "404" })), context), /exploit attribution/);
 		assert.throws(() => parseSecurityAccessLine(JSON.stringify(payload({ severity: "medium" })), context), /exploit attribution/);
 		assert.throws(() => parseSecurityAccessLine(JSON.stringify(payload({ rule_action: "detect", severity: "high", status: "404" })), context), /exploit attribution/);
