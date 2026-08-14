@@ -42,6 +42,28 @@ describe("security event parser", () => {
 		assert.throws(() => parseSecurityAccessLine(JSON.stringify(payload({ proxy_host_id: "" })), context), /Missing proxy_host_id/);
 	});
 
+	it("accepts a detect-only attribution at whatever status the request actually got", () => {
+		// A host with Block Common Exploits switched off now still gets told what
+		// matched. Nothing blocked, so the response is whatever it would have been
+		// -- pinning attribution to 403, as the block-era guard did, discarded
+		// exactly these records.
+		const detected = payload({ rule_action: "detect", severity: "medium", status: "404" });
+		const event = parseSecurityAccessLine(JSON.stringify(detected), context);
+		assert.equal(event.event_type, "exploit_rule");
+		assert.equal(event.rule_action, "detect");
+		assert.equal(event.status, 404);
+		assert.equal(parseSecurityAccessLine(JSON.stringify({ ...detected, status: "200" }), context).status, 200);
+	});
+
+	it("refuses an attribution that claims an enforcement it could not have performed", () => {
+		// A record is only as trustworthy as the file it came from, so a claimed
+		// block must carry the 403 it caused and the severity that goes with it.
+		assert.throws(() => parseSecurityAccessLine(JSON.stringify(payload({ status: "404" })), context), /exploit attribution/);
+		assert.throws(() => parseSecurityAccessLine(JSON.stringify(payload({ severity: "medium" })), context), /exploit attribution/);
+		assert.throws(() => parseSecurityAccessLine(JSON.stringify(payload({ rule_action: "detect", severity: "high", status: "404" })), context), /exploit attribution/);
+		assert.throws(() => parseSecurityAccessLine(JSON.stringify(payload({ rule_action: "warn", severity: "medium" })), context), /exploit attribution/);
+	});
+
 	it("rejects malformed, inconsistent, invalid-IP, and oversized input", () => {
 		assert.throws(() => parseSecurityAccessLine("{", context));
 		assert.throws(() => parseSecurityAccessLine(JSON.stringify(payload({ event_type: "http_status" })), context));

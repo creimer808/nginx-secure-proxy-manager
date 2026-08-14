@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import net from "node:net";
-import { RULE_ID_PREFIXES } from "./security-rule-catalog.js";
+import { BLOCKING_RULE_IDS, RULE_ACTION_BLOCK, RULE_ACTION_DETECT, RULE_ID_PREFIXES } from "./security-rule-catalog.js";
 
 const MAX_EVENT_BYTES = 256 * 1024;
 const SECURITY_SCHEMA_VERSION = "1";
@@ -69,7 +69,15 @@ const parseSecurityAccessLine = (line, context) => {
 	const status = asInteger(raw.status, "status", { required: true, minimum: 100, maximum: 599 });
 	if (!EVENT_TYPES.has(type) || !SEVERITIES.has(severity)) throw new Error("Invalid event type or severity");
 	if (type === "exploit_rule") {
-		if (!ruleId || !RULE_ID.test(ruleId) || raw.rule_action !== "block" || status !== 403 || severity !== "high") throw new Error("Invalid exploit attribution");
+		if (!ruleId || !RULE_ID.test(ruleId)) throw new Error("Invalid exploit attribution");
+		// A blocked match must be a rule that is actually permitted to block and
+		// must carry the 403 it caused. Detect-only matches changed nothing about
+		// the response, so their status is whatever the request would have got.
+		if (raw.rule_action === RULE_ACTION_BLOCK) {
+			if (!BLOCKING_RULE_IDS.has(ruleId) || status !== 403 || severity !== "high") throw new Error("Invalid exploit attribution");
+		} else if (raw.rule_action !== RULE_ACTION_DETECT || severity !== "medium") {
+			throw new Error("Invalid exploit attribution");
+		}
 	} else if (ruleId || raw.rule_category || raw.rule_action || !(OBSERVATION_STATUSES.has(status) || status >= 500)) {
 		throw new Error("Invalid status observation");
 	}

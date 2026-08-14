@@ -65,9 +65,44 @@ describe("security attribution Nginx contract", () => {
 
 	it("keeps legacy and default-server blocking enabled through the include", () => {
 		assert.match(block, /set \$security_exploit_protection_enabled 1;/);
-		assert.match(block, /if \(\$security_rule_id != ""\) \{\s*return 403;/);
+		assert.match(block, /if \(\$security_blocking_rule_id != ""\) \{\s*return 403;/);
 		assert.match(defaultConfig, /include conf\.d\/include\/block-exploits\.conf;/);
 		assert.match(template, /set \$security_exploit_protection_enabled/);
+	});
+
+	it("detects on every host but blocks only opted-in hosts, and only with legacy rules", () => {
+		// Enforcement must never read the ungated id: that variable now carries
+		// detect-only rules whose whole point is that they change no response.
+		const blockDirectives = block.replace(/^\s*#.*$/gm, "");
+		assert.doesNotMatch(blockDirectives, /\$security_rule_id\b/, "block-exploits.conf must gate on $security_blocking_rule_id");
+		assert.match(mapBody("security_rule_id"), /default \$security_detected_rule_id;/, "attribution must not be gated on the blocking switch");
+
+		// Only a blockable rule on an opted-in host resolves to a blocking id.
+		assert.match(mapBody("security_blocking_rule_id"), /~\^1:1:\(\.\+\)\$\s+\$1;/);
+
+		const blockable = mapBody("security_rule_blockable");
+		const blockablePrefixes = new Set([...blockable.matchAll(/~\^([a-z0-9]+)\\\.\s+1;/g)].map((match) => match[1]));
+		for (const rule of SECURITY_RULES) {
+			const prefix = rule.id.split(".")[0];
+			const permitted = blockablePrefixes.has(prefix);
+			assert.equal(permitted, rule.action === "block", `rule ${rule.id} is action=${rule.action} in the catalog but ${permitted ? "" : "not "}blockable in Nginx`);
+		}
+		// A prefix is the unit of blockability, so a detect-only rule must never
+		// share a prefix with a blocking one.
+		for (const rule of SECURITY_RULES) {
+			const siblings = SECURITY_RULES.filter((other) => other.id.split(".")[0] === rule.id.split(".")[0]);
+			assert.equal(new Set(siblings.map((other) => other.action)).size, 1, `prefix ${rule.id.split(".")[0]} mixes blocking and detect-only rules`);
+		}
+	});
+
+	it("does not let a detect-only match outrank an enforcement action", () => {
+		const severity = mapBody("security_severity");
+		assert.match(severity, /~\^block:\s+high;/);
+		assert.match(severity, /~\^detect:\s+medium;/);
+		const action = mapBody("security_rule_action");
+		assert.match(action, /~\^:\s+"";/, "no rule match must produce no action");
+		assert.match(action, /~:1:1\$\s+block;/);
+		assert.match(action, /default\s+detect;/);
 	});
 
 	it("records the traffic that never reaches a proxy host", () => {
