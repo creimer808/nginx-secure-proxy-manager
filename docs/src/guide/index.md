@@ -8,7 +8,7 @@ Nginx Secure Proxy Manager (NSPM) is a security-focused, unofficial fork of [Ngi
 
 | Version | Current value |
 | --- | --- |
-| NSPM application | `0.1.2` |
+| NSPM application | `0.1.3` |
 | Upstream NPM compatibility baseline | `2.15.1` |
 
 > NSPM is independently maintained by [CyberSec.Cam](https://www.cybersec.cam) / [creimer808](https://github.com/creimer808). It is not affiliated with or endorsed by NGINX, Inc. or the official Nginx Proxy Manager project.
@@ -25,7 +25,7 @@ Nginx Secure Proxy Manager (NSPM) is a security-focused, unofficial fork of [Ngi
 ```yaml
 services:
   app:
-    image: ghcr.io/creimer808/nginx-proxy-manager:0.1.2
+    image: ghcr.io/creimer808/nginx-proxy-manager:0.1.3
     restart: unless-stopped
     ports:
       - "80:80"

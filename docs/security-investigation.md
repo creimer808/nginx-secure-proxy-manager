@@ -2,6 +2,10 @@
 
 The top-level **Security** page turns locally generated Nginx telemetry into an investigation aid. It complements the lightweight aggregate dashboard; it is not an IDS, SIEM, or proof that a client is malicious or an application was compromised.
 
+> **v0.1.2 collected no data.** In v0.1.2 the Security page shipped functionally inert. Nginx never received the security logging directive — the startup upgrade's commit gate included a reload that lost a startup race and rolled every host back — and the collector spent its whole per-cycle budget re-hashing existing log archives, so it could never advance a cursor. Both failures were silent: startup logs looked healthy and the page showed an empty but "Available" collector.
+>
+> v0.1.3 fixes both. There is nothing to recover: no telemetry from the v0.1.2 period was ever written, and no backfill is performed. Collection begins from the point v0.1.3 starts.
+
 ## What is recorded
 
 A dedicated JSON Lines log is written for each proxy host when either:
@@ -58,15 +62,27 @@ The event shows both Nginx's interpreted client address and the immediate connec
 
 ## Upgrade behavior
 
-At startup, NSPM detects older generated proxy-host files that lack security logging. It renders replacements, prepares restrictive log files, preserves backups, runs `nginx -t`, and reloads only after validation. If validation or reload fails, the previous configurations are restored. Existing exploit protection remains enabled during this transition.
+At startup, NSPM detects older generated proxy-host files that lack security logging. Each host is rendered, staged, validated with `nginx -t`, and committed on its own, so a single host that cannot be validated — an expired certificate file, an unusual `advanced_config` — is restored and skipped without affecting the others.
+
+A successful `nginx -t` is the commit point. Reloading is a delivery step, not a validation step: the backend and Nginx start concurrently under s6 with no readiness ordering between them, so when Nginx is not yet running the reload is skipped and the new files are read when it starts.
+
+The result is recorded and shown in **Security → Configuration**: hosts upgraded, hosts skipped, whether the reload was deferred, and the last failure reason. If logging is not active, that panel says so without requiring container logs.
+
+## Coverage outside proxy hosts
+
+Requests that never reach a proxy host — unknown `Host` headers, raw-IP hits, background scanning — are recorded in `/data/logs/fallback_security.log` by the default and fallback servers. Redirection hosts, dead hosts, and a configured default site write there too, because those have their own id spaces and cannot be attributed to a `proxy_host_id`.
+
+Fallback records carry no proxy host id. The existing visibility guard requires a non-null `proxy_host_id` for non-administrators, so these events, and the raw fallback log, are administrator-only.
+
+Existing redirection-host and dead-host configurations are regenerated when they are next saved; the startup upgrade covers proxy hosts only.
 
 ## Verification
 
-The static Nginx contract tests run with the backend Node tests. The runtime attribution suite requires an explicitly selected candidate image:
+The static Nginx contract tests run with the backend Node tests. The runtime attribution suite requires an explicitly selected candidate image, and runs in CI against the built candidate before anything is published:
 
 ```bash
 SECURITY_NGINX_TEST_IMAGE=<candidate-image> \
-  node --test docker/rootfs/etc/nginx/conf.d/include/security-rules.runtime.test.js
+  node --test backend/lib/security-rules.runtime.test.js
 ```
 
 Do not use an unrelated or stale image when validating a release. MySQL and PostgreSQL migration/API checks should also be run in the repository's database CI matrix before release.

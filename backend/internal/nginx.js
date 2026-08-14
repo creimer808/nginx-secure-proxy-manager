@@ -238,108 +238,121 @@ const internalNginx = {
 	},
 
 	/**
-	 * Replace older proxy-host config files only after all replacements have
-	 * been rendered, security logs prepared, and Nginx accepts the candidate.
-	 * On any failure every original file is restored before the caller continues.
+	 * Nginx and the backend are both s6 longruns with no readiness ordering
+	 * between them, so at startup the backend routinely runs before Nginx has
+	 * written its pid file. A reload is a delivery step, not a validation step:
+	 * when there is nothing to signal, the new files are simply read at startup.
+	 *
+	 * @returns {Boolean}
+	 */
+	isRunning: () => {
+		try {
+			return fs.existsSync("/run/nginx/nginx.pid");
+		} catch {
+			return false;
+		}
+	},
+
+	/**
+	 * Regenerate proxy-host files created before security logging existed.
+	 *
+	 * Each host is staged, validated with `nginx -t`, and committed on its own.
+	 * A single host that cannot be validated — an expired certificate file, an
+	 * unusual advanced_config — is restored and skipped, and never disables
+	 * security logging for the others.
 	 *
 	 * @param {Object[]} hosts
-	 * @returns {Promise<boolean>} true when an upgrade was applied
+	 * @returns {Promise<{total: Number, upgraded: Number, skipped: Number, pending: Number, reloadDeferred: Boolean, lastError: String|null}>}
 	 */
 	upgradeProxyHostConfigs: async (hosts) => {
-		// Recover an interrupted prior upgrade before making new decisions. Without
-		// a durable commit marker, a retained backup is authoritative: restore it
-		// and retry the validated upgrade from the beginning.
+		const result = { total: hosts.length, upgraded: 0, skipped: 0, pending: 0, reloadDeferred: false, lastError: null };
+
+		// `nginx -t` validates the whole configuration, so it is only a usable
+		// per-host gate when the configuration is valid to begin with.
+		try {
+			await internalNginx.test();
+		} catch (err) {
+			result.pending = hosts.length;
+			result.lastError = `existing Nginx configuration is invalid: ${err.message}`;
+			logger.error(`Security logging upgrade did not run: ${result.lastError}`);
+			return result;
+		}
+
 		for (const host of hosts) {
 			const filename = internalNginx.getConfigName("proxy_host", host.id);
 			const backupFilename = `${filename}.security-backup`;
 			const stagedFilename = `${filename}.security-upgrade`;
-			if (fs.existsSync(backupFilename)) {
-				if (fs.existsSync(filename)) fs.unlinkSync(filename);
-				fs.renameSync(backupFilename, filename);
-				logger.warn(`Recovered interrupted security upgrade for proxy host ${host.id}`);
-			}
-			fs.rmSync(stagedFilename, { force: true });
-			ensureSecurityLogFile(Number(host.id));
-		}
-
-		const upgradeHosts = hosts.filter((host) => {
-			const filename = internalNginx.getConfigName("proxy_host", host.id);
+			let existed = false;
+			let swapped = false;
 			try {
-				return !fs.readFileSync(filename, "utf8").includes("_security.log security_json");
-			} catch {
-				return true;
-			}
-		});
-		if (upgradeHosts.length === 0) {
-			return false;
-		}
-
-		const staged = [];
-		const backups = [];
-		let committed = false;
-		try {
-			for (const host of upgradeHosts) {
-				const filename = internalNginx.getConfigName("proxy_host", host.id);
-				const stagedFilename = `${filename}.security-upgrade`;
-				fs.writeFileSync(stagedFilename, await internalNginx.renderConfig("proxy_host", host), { encoding: "utf8", mode: 0o640 });
-				staged.push({ filename, stagedFilename });
-			}
-
-			for (const item of staged) {
-				const backupFilename = `${item.filename}.security-backup`;
+				// Recover an interrupted prior upgrade before making new decisions.
+				// Without a durable commit marker a retained backup is authoritative:
+				// restore it and retry the validated upgrade for this host.
 				if (fs.existsSync(backupFilename)) {
-					throw new Error(`Refusing to overwrite existing security upgrade backup: ${backupFilename}`);
+					if (fs.existsSync(filename)) fs.unlinkSync(filename);
+					fs.renameSync(backupFilename, filename);
+					logger.warn(`Recovered interrupted security upgrade for proxy host ${host.id}`);
 				}
-				const backup = { ...item, backupFilename, existed: fs.existsSync(item.filename) };
-				if (backup.existed) {
-					fs.renameSync(item.filename, backupFilename);
-				}
-				backups.push(backup);
-				fs.renameSync(item.stagedFilename, item.filename);
-			}
-			await internalNginx.test();
-			await internalNginx.reload();
-			// A successful reload is the commit point. Backup cleanup failures must
-			// never enter the destructive rollback path and remove active hosts.
-			committed = true;
-			for (const backup of backups) {
-				if (backup.existed) {
-					try {
-						fs.unlinkSync(backup.backupFilename);
-					} catch (cleanupErr) {
-						logger.warn(`Could not remove committed proxy host backup ${backup.backupFilename}: ${cleanupErr.message}`);
-					}
-				}
-			}
-			logger.info(`Upgraded ${upgradeHosts.length} proxy host config(s) for security logging`);
-			return true;
-		} catch (err) {
-			if (committed) {
-				throw err;
-			}
-			for (const backup of backups.reverse()) {
+				fs.rmSync(stagedFilename, { force: true });
+
+				let current = "";
 				try {
-					if (fs.existsSync(backup.filename)) {
-						fs.unlinkSync(backup.filename);
-					}
-					if (backup.existed && fs.existsSync(backup.backupFilename)) {
-						fs.renameSync(backup.backupFilename, backup.filename);
-					}
-				} catch (restoreErr) {
-					logger.error(`Could not restore proxy host config ${backup.filename}: ${restoreErr.message}`);
+					current = fs.readFileSync(filename, "utf8");
+					existed = true;
+				} catch {
+					existed = false;
 				}
-			}
-			for (const item of staged) {
-				fs.rmSync(item.stagedFilename, { force: true });
-			}
-			try {
+				if (current.includes("_security.log security_json")) continue;
+
+				// Preparing the log file can fail on its own (a stale root-owned file,
+				// a symlinked /data). That must skip one host, not abort the sweep.
+				ensureSecurityLogFile(Number(host.id));
+				fs.writeFileSync(stagedFilename, await internalNginx.renderConfig("proxy_host", host), { encoding: "utf8", mode: 0o640 });
+				if (existed) fs.renameSync(filename, backupFilename);
+				fs.renameSync(stagedFilename, filename);
+				swapped = true;
 				await internalNginx.test();
-				await internalNginx.reload();
-			} catch (restoreErr) {
-				logger.error(`Restored Nginx configuration could not be reloaded: ${restoreErr.message}`);
+				swapped = false;
+				if (existed) {
+					try {
+						fs.unlinkSync(backupFilename);
+					} catch (cleanupErr) {
+						logger.warn(`Could not remove committed proxy host backup ${backupFilename}: ${cleanupErr.message}`);
+					}
+				}
+				result.upgraded += 1;
+			} catch (err) {
+				if (swapped) {
+					try {
+						fs.rmSync(filename, { force: true });
+						if (existed) fs.renameSync(backupFilename, filename);
+					} catch (restoreErr) {
+						logger.error(`Could not restore proxy host config ${filename}: ${restoreErr.message}`);
+					}
+				}
+				fs.rmSync(stagedFilename, { force: true });
+				result.skipped += 1;
+				result.lastError = `proxy host ${host.id}: ${err.message}`;
+				logger.error(`Security logging upgrade skipped for proxy host ${host.id}: ${err.message}`);
 			}
-			throw err;
 		}
+
+		if (result.upgraded > 0) {
+			if (internalNginx.isRunning()) {
+				try {
+					logger.info("Reloading Nginx");
+					await utils.execFile("/usr/sbin/nginx", ["-s", "reload"]);
+				} catch (err) {
+					result.reloadDeferred = true;
+					logger.warn(`Upgraded configuration is staged but Nginx could not be reloaded; it applies at next start: ${err.message}`);
+				}
+			} else {
+				result.reloadDeferred = true;
+				logger.info("Nginx is not running yet; upgraded security logging configuration will be read when it starts");
+			}
+			logger.info(`Upgraded ${result.upgraded} proxy host config(s) for security logging`);
+		}
+		return result;
 	},
 
 	/**

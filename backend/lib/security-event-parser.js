@@ -58,7 +58,9 @@ const parseSecurityAccessLine = (line, context) => {
 	try { raw = JSON.parse(line); } catch { throw new Error("Malformed security JSON"); }
 	if (!raw || Array.isArray(raw) || typeof raw !== "object") throw new Error("Invalid security JSON");
 	if (asString(raw.schema_version, "schema_version", { required: true, max: 16 }) !== SECURITY_SCHEMA_VERSION) throw new Error("Unsupported security schema version");
-	const proxyHostId = asInteger(raw.proxy_host_id, "proxy_host_id", { required: true, minimum: 1 });
+	// A null context host is the fallback/default server: those requests never
+	// reached a proxy host, so the line carries no id and neither does the event.
+	const proxyHostId = asInteger(raw.proxy_host_id, "proxy_host_id", { required: context.proxyHostId !== null, minimum: 1 });
 	if (proxyHostId !== context.proxyHostId) throw new Error("Security event proxy host mismatch");
 	const ruleId = asString(raw.rule_id, "rule_id", { max: 128 });
 	const type = asString(raw.event_type, "event_type", { required: true, max: 32 });

@@ -11,7 +11,7 @@ const cursor = (overrides = {}) => ({ segment_id: "segment", log_kind: "security
 before(async () => {
 	db = knex({ client: "better-sqlite3", connection: { filename: ":memory:" }, useNullAsDefault: true });
 	await db.schema.createTable("security_event", (table) => { table.increments(); table.bigInteger("occurred_at_ms"); table.dateTime("created_on"); table.integer("proxy_host_id"); table.string("source_kind"); table.string("event_type"); table.string("severity"); table.string("event_id").unique(); table.string("ingest_segment_id"); table.bigInteger("ingest_line_offset"); table.unique(["ingest_segment_id", "ingest_line_offset"]); });
-	await db.schema.createTable("security_log_cursor", (table) => { table.increments(); table.string("segment_id"); table.string("log_kind"); table.string("file_key"); table.string("file_path"); table.bigInteger("byte_offset"); table.string("content_fingerprint"); table.dateTime("updated_on"); table.unique(["segment_id", "log_kind"]); });
+	await db.schema.createTable("security_log_cursor", (table) => { table.increments(); table.string("segment_id"); table.string("log_kind"); table.string("file_key"); table.string("file_path"); table.bigInteger("byte_offset"); table.string("content_fingerprint"); table.bigInteger("fingerprint_size").defaultTo(0); table.dateTime("updated_on"); table.unique(["segment_id", "log_kind"]); });
 	await db.schema.createTable("security_collector_state", (table) => { table.increments(); table.dateTime("last_started_on"); table.dateTime("last_completed_on"); table.dateTime("last_error_on"); table.string("last_error_summary"); table.bigInteger("bytes_read"); table.bigInteger("lines_read"); table.bigInteger("events_inserted"); table.bigInteger("malformed_lines"); table.bigInteger("files_pending"); table.boolean("limit_reached"); table.boolean("database_high_water_reached"); table.boolean("raw_log_disk_high_water_reached"); });
 });
 after(() => db.destroy());
@@ -22,6 +22,19 @@ describe("security event commit", () => {
 		await db.transaction((trx) => writeSecurityEvents(trx, { events: [event()], cursors: [cursor({ byte_offset: 20 })], state, retentionDays: 30 }));
 		assert.equal(Number((await db("security_event").count("id as count").first()).count), 1);
 		assert.equal((await db("security_log_cursor").first()).byte_offset, 20);
+	});
+
+	it("skips a replayed segment offset carrying different content", async () => {
+		// A truncate-and-regrow of the same inode reuses a segment's line offsets
+		// with new content: a fresh event_id, but a duplicate (segment, offset).
+		// Preflighting only event_id would abort the whole batch here.
+		await db.transaction((trx) => writeSecurityEvents(trx, { events: [event({ event_id: "regrow-a", ingest_segment_id: "regrow", ingest_line_offset: 0 })], cursors: [], state, retentionDays: 30 }));
+		await db.transaction((trx) => writeSecurityEvents(trx, {
+			events: [event({ event_id: "regrow-b", ingest_segment_id: "regrow", ingest_line_offset: 0 }), event({ event_id: "regrow-c", ingest_segment_id: "regrow", ingest_line_offset: 40 })],
+			cursors: [], state, retentionDays: 30,
+		}));
+		assert.equal(await db("security_event").where("event_id", "regrow-b").first(), undefined);
+		assert.ok(await db("security_event").where("event_id", "regrow-c").first());
 	});
 
 	it("rolls events and cursors back together", async () => {

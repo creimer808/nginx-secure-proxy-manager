@@ -33,10 +33,8 @@ const allLocales = [
 
 const ignoreUnused = [/^.*$/];
 
-const { spawnSync } = require("child_process");
 const fs = require("fs");
-
-const tmp = require("tmp");
+const path = require("path");
 
 // Parse backend errors
 const BACKEND_ERRORS_FILE = "../backend/internal/errors/errors.go";
@@ -57,11 +55,47 @@ try {
 }
 */
 
-// get all translations used in frontend code
-const tmpobj = tmp.fileSync({ postfix: ".json" });
-spawnSync("yarn", ["locale-extract", "--out-file", tmpobj.name]);
+// Collect the message ids the application actually uses.
+//
+// This used to shell out to a bare `yarn locale-extract`. With no `yarn` on
+// PATH the spawn failed silently, the temp file stayed empty, and the script
+// died on `require` with "Unexpected end of JSON input" instead of naming the
+// missing id — which is how a `<T id="action.save" />` that resolves to no
+// message shipped and rendered its own id as button text.
+//
+// `formatjs extract` cannot be used here either: it aborts and writes `{}` as
+// soon as it meets a computed `id={...}`, and this codebase has several. So
+// scan the source for literal ids directly. Computed ids are counted and
+// reported, but cannot be checked.
+const SOURCE_ROOT = "src";
+const LITERAL_ID_PATTERNS = [/<T\s[^>]*?\bid="([^"]+)"/gs, /\bid:\s*"([^"]+)"\s*\}/g];
+const COMPUTED_ID_PATTERN = /<T\s[^>]*?\bid=\{/gs;
 
-const allLocalesInProject = require(tmpobj.name);
+const sourceFiles = (directory) => {
+  const found = [];
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const full = path.join(directory, entry.name);
+    if (entry.isDirectory()) found.push(...sourceFiles(full));
+    else if (/\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) found.push(full);
+  }
+  return found;
+};
+
+const allLocalesInProject = {};
+let computedIds = 0;
+for (const file of sourceFiles(SOURCE_ROOT)) {
+  const content = fs.readFileSync(file, "utf8");
+  for (const pattern of LITERAL_ID_PATTERNS) {
+    for (const match of content.matchAll(pattern)) {
+      allLocalesInProject[match[1]] = { file };
+    }
+  }
+  computedIds += [...content.matchAll(COMPUTED_ID_PATTERN)].length;
+}
+if (!Object.keys(allLocalesInProject).length) {
+  console.log("\x1b[31m%s\x1b[0m", `ERROR: found no message ids under ${SOURCE_ROOT}/`);
+  process.exit(1);
+}
 
 // get list og language names and locales
 const langList = require("./src/locale/src/lang-list.json");
@@ -80,10 +114,15 @@ const checkLangList = (fullCode) => {
 
 const compareLocale = (locale) => {
   const projectLocaleKeys = Object.keys(allLocalesInProject);
-  // Check that locale contains the items used in the codebase
+  // Check that locale contains the items used in the codebase.
+  // `en` is the source of truth: a message id used in code but absent there
+  // renders as the raw id in the UI, so it is an error. The other locales are
+  // legitimately incomplete and are reported as warnings.
+  const severity = locale[0] === "en" ? allErrors : allWarnings;
+  const label = locale[0] === "en" ? "ERROR" : "WARN";
   projectLocaleKeys.map((key) => {
     if (typeof locale.data[key] === "undefined") {
-      allErrors.push("ERROR: `" + locale[0] + "` does not contain item: `" + key + "`");
+      severity.push(label + ": `" + locale[0] + "` does not contain item: `" + key + "`");
     }
     return null;
   });
@@ -163,5 +202,8 @@ if (allErrors.length) {
   process.exit(1);
 }
 
-console.log("\x1b[32m%s\x1b[0m", "Locale check passed");
+console.log(
+  "\x1b[32m%s\x1b[0m",
+  `Locale check passed (${Object.keys(allLocalesInProject).length} literal ids checked, ${computedIds} computed ids not checkable)`,
+);
 process.exit(0);

@@ -1,3 +1,4 @@
+import db from "./db.js";
 import { installPlugins } from "./lib/certbot.js";
 import utils from "./lib/utils.js";
 import { setup as logger } from "./logger.js";
@@ -180,8 +181,11 @@ const setupLogrotation = () => {
 
 /**
  * Regenerate only proxy-host files created before security logging existed.
- * The Nginx service stages every replacement, validates the candidate, and
- * restores the last known working files if validation or reload fails.
+ * The Nginx service stages, validates, and commits each host independently.
+ *
+ * The outcome is persisted rather than only logged: an operator must be able to
+ * see from the Security → Configuration tab that logging is not active, without
+ * reading container logs.
  */
 const upgradeSecurityProxyHostConfigs = async () => {
 	const hosts = await proxyHostModel
@@ -191,10 +195,29 @@ const upgradeSecurityProxyHostConfigs = async () => {
 		.allowGraph(proxyHostModel.defaultAllowGraph)
 		.withGraphFetched(`[${proxyHostModel.defaultExpand.join(", ")}]`);
 
+	let result = { total: hosts.length, upgraded: 0, skipped: 0, pending: hosts.length, reloadDeferred: false, lastError: null };
 	try {
-		await internalNginx.upgradeProxyHostConfigs(hosts);
+		result = await internalNginx.upgradeProxyHostConfigs(hosts);
 	} catch (err) {
-		logger.error(`Security proxy-host configuration upgrade failed; existing configs were restored: ${err.message}`);
+		result.lastError = err.message;
+		logger.error(`Security proxy-host configuration upgrade failed: ${err.message}`);
+	}
+
+	try {
+		const values = {
+			last_run_on: new Date(),
+			hosts_total: result.total,
+			hosts_upgraded: result.upgraded,
+			hosts_skipped: result.skipped,
+			hosts_pending: result.pending,
+			reload_deferred: result.reloadDeferred,
+			last_error_summary: result.lastError ? String(result.lastError).slice(0, 512) : null,
+		};
+		const existing = await db()("security_config_state").first();
+		if (existing) await db()("security_config_state").where("id", existing.id).update(values);
+		else await db()("security_config_state").insert(values);
+	} catch (err) {
+		logger.warn(`Could not record the security configuration upgrade status: ${err.message}`);
 	}
 };
 

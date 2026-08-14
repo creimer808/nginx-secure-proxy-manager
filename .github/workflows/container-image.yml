@@ -82,6 +82,7 @@ jobs:
         run: |
           yarn install --frozen-lockfile
           yarn locale-compile
+          yarn check-locales
           yarn lint
           yarn vitest run --no-color
           yarn build
@@ -91,6 +92,31 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      # A file-text contract test passes whether or not Nginx writes a byte. This
+      # is the only gate that proves the shipped image actually emits security
+      # records, so it runs against the candidate before anything is published.
+      - name: Build candidate image for runtime verification
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          load: true
+          tags: nginx-secure-proxy-manager:runtime-test
+          build-args: |
+            BUILD_VERSION=${{ steps.versions.outputs.app_version }}
+            BUILD_COMMIT=${{ github.sha }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp || github.event.repository.updated_at }}
+            UPSTREAM_VERSION=${{ steps.versions.outputs.upstream_version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify Nginx security logging against the candidate image
+        working-directory: backend
+        env:
+          SECURITY_NGINX_TEST_IMAGE: nginx-secure-proxy-manager:runtime-test
+        run: node --test lib/security-rules.runtime.test.js
 
       - name: Log in to GitHub Container Registry
         if: github.event_name != 'pull_request'

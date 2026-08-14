@@ -23,7 +23,7 @@ const expectedRules = [
 	"ua.download-demon", "ua.go-ahead-got-it", "ua.turnitinbot", "ua.grabnet",
 ];
 
-const securityLogrotateBlock = logrotate.match(/\/data\/logs\/proxy-host-\*_security\.log \{[\s\S]*?\n\}/)?.[0] || "";
+const securityLogrotateBlock = logrotate.match(/\/data\/logs\/\*_security\.log \{[\s\S]*?\n\}/)?.[0] || "";
 
 describe("security attribution Nginx contract", () => {
 	it("keeps every legacy signature mapped to one stable rule ID", () => {
@@ -48,6 +48,19 @@ describe("security attribution Nginx contract", () => {
 		assert.match(block, /if \(\$security_rule_id != ""\) \{\s*return 403;/);
 		assert.match(defaultConfig, /include conf\.d\/include\/block-exploits\.conf;/);
 		assert.match(template, /set \$security_exploit_protection_enabled/);
+	});
+
+	it("records the traffic that never reaches a proxy host", () => {
+		// The default server blocks exploits and returns 403. Without its own
+		// security log every unknown-Host hit and raw-IP scan is discarded.
+		assert.match(defaultConfig, /access_log \/data\/logs\/fallback_security\.log security_json if=\$security_log_enabled;/);
+		for (const file of ["backend/templates/default.conf", "backend/templates/redirection_host.conf", "backend/templates/dead_host.conf"]) {
+			assert.match(read(file), /access_log \/data\/logs\/fallback_security\.log security_json if=\$security_log_enabled;/);
+		}
+		// The fallback record carries no proxy host id, which is what keeps it
+		// administrator-only under the existing visibility guard.
+		assert.doesNotMatch(defaultConfig, /set \$security_proxy_host_id/);
+		assert.match(securityLogrotateBlock, /\/data\/logs\/\*_security\.log/);
 	});
 
 	it("labels matches and status observations without logging benign 2xx responses", () => {

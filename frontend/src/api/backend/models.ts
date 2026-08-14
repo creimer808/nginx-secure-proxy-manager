@@ -316,7 +316,9 @@ export interface SecurityRule { id: string; category: string; description: strin
 export interface SecurityLogFile { rotation: string; compressed: boolean; available: boolean; }
 export interface SecurityLogLine { offset: number; line: string; }
 export interface SecurityLogPage { lines: SecurityLogLine[]; partial: boolean; scanLimitBytes: number; nextCursor: string | null; previousCursor: string | null; }
-export interface SecuritySettings { retentionDays: number; }
+/** Outcome of the startup proxy-host configuration upgrade. Administrators only. */
+export interface SecurityNginxUpgrade { lastRunOn: string | null; hostsTotal: number; hostsUpgraded: number; hostsSkipped: number; hostsPending: number; reloadDeferred: boolean; lastErrorSummary: string | null; }
+export interface SecuritySettings { retentionDays: number; nginxUpgrade?: SecurityNginxUpgrade | null; }
 
 export interface SecurityEventFilters {
 	from?: string;

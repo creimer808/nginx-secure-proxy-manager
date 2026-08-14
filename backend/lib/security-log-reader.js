@@ -26,17 +26,26 @@ const openSecurityLog = (filePath, logDir) => {
 	}
 };
 
-const createFingerprint = (full = false) => {
+const createFingerprint = (full = false, maxFingerprintBytes = Number.MAX_SAFE_INTEGER) => {
 	const hash = crypto.createHash("sha256");
-	let remaining = full ? Number.MAX_SAFE_INTEGER : FINGERPRINT_BYTES;
+	let remaining = full ? maxFingerprintBytes : FINGERPRINT_BYTES;
+	let hashed = 0;
+	let overflowed = false;
 	return {
 		update: (chunk) => {
-			if (remaining <= 0) return;
+			if (remaining <= 0) {
+				overflowed = overflowed || chunk.length > 0;
+				return;
+			}
 			const selected = chunk.subarray(0, remaining);
+			if (selected.length < chunk.length) overflowed = true;
 			hash.update(selected);
 			remaining -= selected.length;
+			hashed += selected.length;
 		},
 		complete: () => remaining === 0,
+		overflowed: () => overflowed,
+		bytes: () => hashed,
 		digest: () => hash.digest("hex"),
 	};
 };
@@ -88,22 +97,25 @@ const createLineCollector = ({ byteOffset, maxBytes, maxLineLength, deadline, st
 	};
 };
 
-const fingerprintDescriptor = (fd, stat, full = false, deadline = Number.MAX_SAFE_INTEGER) => {
+const fingerprintDescriptor = (fd, stat, full = false, deadline = Number.MAX_SAFE_INTEGER, maxFingerprintBytes = Number.MAX_SAFE_INTEGER) => {
 	const hash = crypto.createHash("sha256");
 	const limit = full ? stat.size : Math.min(stat.size, FINGERPRINT_BYTES);
+	// A metered fingerprint reports incomplete rather than reading past its
+	// budget, so a caller can defer identification instead of stalling a cycle.
+	if (full && limit > maxFingerprintBytes) return { digest: hash.digest("hex"), complete: false, bytes: 0 };
 	let position = 0;
 	while (position < limit) {
-		if (Date.now() >= deadline) return { digest: hash.digest("hex"), complete: false };
+		if (Date.now() >= deadline) return { digest: hash.digest("hex"), complete: false, bytes: position };
 		const buffer = Buffer.alloc(Math.min(READ_CHUNK_BYTES, limit - position));
 		const read = fs.readSync(fd, buffer, 0, buffer.length, position);
 		if (!read) break;
 		hash.update(buffer.subarray(0, read));
 		position += read;
 	}
-	return { digest: hash.digest("hex"), complete: true };
+	return { digest: hash.digest("hex"), complete: true, bytes: position };
 };
 
-const readPlain = ({ fd, stat, byteOffset, maxBytes, maxLineLength, deadline, aborted, fullFingerprint = false }) => {
+const readPlain = ({ fd, stat, byteOffset, maxBytes, maxLineLength, deadline, aborted, fullFingerprint = false, maxFingerprintBytes = Number.MAX_SAFE_INTEGER }) => {
 	let position = byteOffset > stat.size ? 0 : byteOffset;
 	const collector = createLineCollector({ byteOffset: position, maxBytes, maxLineLength, deadline, startOffset: position, aborted });
 	while (position < stat.size && Date.now() < deadline && !aborted?.()) {
@@ -112,15 +124,18 @@ const readPlain = ({ fd, stat, byteOffset, maxBytes, maxLineLength, deadline, ab
 		if (!read || !collector.append(buffer.subarray(0, read))) break;
 		position += read;
 	}
-	const fingerprint = fingerprintDescriptor(fd, stat, fullFingerprint, deadline);
-	return { ...collector.result(), fingerprint: fingerprint.digest, fingerprintComplete: fingerprint.complete };
+	const fingerprint = fingerprintDescriptor(fd, stat, fullFingerprint, deadline, maxFingerprintBytes);
+	return { ...collector.result(), fingerprint: fingerprint.digest, fingerprintComplete: fingerprint.complete, fingerprintBytes: fingerprint.bytes };
 };
 
-const readGzip = async ({ fd, stat, byteOffset, maxBytes, maxLineLength, maxCompressedBytes, maxOutputBytes, maxExpansionRatio, deadline, aborted, fullFingerprint = false }) => {
+const readGzip = async ({ fd, stat, byteOffset, maxBytes, maxLineLength, maxCompressedBytes, maxOutputBytes, maxExpansionRatio, deadline, aborted, fullFingerprint = false, maxFingerprintBytes = Number.MAX_SAFE_INTEGER }) => {
 	let compressedBytes = 0;
 	let limited = false;
 	// Gzip has no safe random-access offset. Re-decompress from the beginning,
 	// but permit enough bounded output to reach the logical cursor plus one page.
+	// The expansion guard is measured against the whole archive, never against
+	// the prefix read so far: log data the system generated itself compresses far
+	// better than the ratio a partial read would suggest.
 	const outputCeiling = Math.min(
 		byteOffset + Math.max(maxOutputBytes, maxBytes, FINGERPRINT_BYTES) + maxLineLength,
 		Math.max(1, Math.min(stat.size, maxCompressedBytes)) * maxExpansionRatio,
@@ -142,15 +157,13 @@ const readGzip = async ({ fd, stat, byteOffset, maxBytes, maxLineLength, maxComp
 	})());
 	const gunzip = createGunzip();
 	const collector = createLineCollector({ byteOffset, maxBytes, maxLineLength, deadline, aborted });
-	const fingerprint = createFingerprint(fullFingerprint);
+	const fingerprint = createFingerprint(fullFingerprint, maxFingerprintBytes);
 	let outputBytes = 0;
 	source.pipe(gunzip);
 	try {
 		for await (const output of gunzip) {
 			if (Date.now() >= deadline || aborted?.()) { limited = true; break; }
-			const ratioLimit = Math.max(compressedBytes, 1) * maxExpansionRatio;
-			const outputLimit = Math.min(outputCeiling, ratioLimit);
-			const allowed = Math.min(output.length, Math.max(0, outputLimit - outputBytes));
+			const allowed = Math.min(output.length, Math.max(0, outputCeiling - outputBytes));
 			if (allowed > 0) {
 				const selected = output.subarray(0, allowed);
 				outputBytes += selected.length;
@@ -171,7 +184,7 @@ const readGzip = async ({ fd, stat, byteOffset, maxBytes, maxLineLength, maxComp
 		gunzip.destroy();
 	}
 	const result = collector.result();
-	return { ...result, deferred: result.deferred || limited, fingerprint: fingerprint.digest(), fingerprintComplete: fullFingerprint ? !limited && compressedBytes === stat.size : fingerprint.complete() };
+	return { ...result, deferred: result.deferred || limited, fingerprint: fingerprint.digest(), fingerprintBytes: fingerprint.bytes(), fingerprintComplete: fullFingerprint ? !limited && compressedBytes === stat.size && !fingerprint.overflowed() : fingerprint.complete() };
 };
 
 const readSecurityLog = async (opened, options) => {
