@@ -350,6 +350,9 @@
 	"dashboard.metrics.no-visible-hosts": {
 		"defaultMessage": "No proxy hosts are visible to this account."
 	},
+	"dashboard.metrics.open-findings": {
+		"defaultMessage": "Open findings"
+	},
 	"dashboard.metrics.open-security": {
 		"defaultMessage": "Open Security investigation"
 	},
@@ -400,6 +403,9 @@
 	},
 	"dashboard.metrics.updating": {
 		"defaultMessage": "Updating…"
+	},
+	"dashboard.metrics.urgent-findings": {
+		"defaultMessage": "{count, plural, one {# needs attention} other {# need attention}}"
 	},
 	"dashboard.posture.access-controlled": {
 		"defaultMessage": "Access list"
@@ -608,6 +614,24 @@
 	"login.title": {
 		"defaultMessage": "Login to your account"
 	},
+	"logs.clear-filters": {
+		"defaultMessage": "Clear all"
+	},
+	"logs.custom-range": {
+		"defaultMessage": "Custom"
+	},
+	"logs.description": {
+		"defaultMessage": "Search collected security events and browse the raw Nginx logs behind them."
+	},
+	"logs.include-operational": {
+		"defaultMessage": "Include operational events"
+	},
+	"logs.remove-filter": {
+		"defaultMessage": "Remove filter"
+	},
+	"logs.title": {
+		"defaultMessage": "Logs"
+	},
 	"nginx-config.label": {
 		"defaultMessage": "Custom Nginx Configuration"
 	},
@@ -788,11 +812,23 @@
 	"security.collector-available": {
 		"defaultMessage": "Available"
 	},
+	"security.collector-database-full": {
+		"defaultMessage": "Event storage reached its high-water mark; new events are being dropped."
+	},
+	"security.collector-degraded": {
+		"defaultMessage": "Degraded"
+	},
 	"security.collector-disabled": {
 		"defaultMessage": "Disabled"
 	},
+	"security.collector-disk-full": {
+		"defaultMessage": "Raw log storage reached its high-water mark."
+	},
 	"security.collector-health": {
 		"defaultMessage": "Collector health"
+	},
+	"security.collector-limit": {
+		"defaultMessage": "The collector stopped early at its per-cycle limit."
 	},
 	"security.collector-unavailable": {
 		"defaultMessage": "Unavailable"
@@ -812,8 +848,14 @@
 	"security.description": {
 		"defaultMessage": "Investigate locally collected Nginx security telemetry. Rule matches and HTTP errors are evidence to review, not proof of compromise."
 	},
+	"security.description-column": {
+		"defaultMessage": "Description"
+	},
 	"security.detail-unavailable": {
 		"defaultMessage": "Full event details could not be loaded."
+	},
+	"security.distinct-sources": {
+		"defaultMessage": "Distinct sources"
 	},
 	"security.duration": {
 		"defaultMessage": "Duration"
@@ -833,11 +875,74 @@
 	"security.events": {
 		"defaultMessage": "Events"
 	},
+	"security.evidence-count": {
+		"defaultMessage": "Evidence"
+	},
+	"security.finding.credential_brute_force": {
+		"defaultMessage": "Credential brute force"
+	},
+	"security.finding.credential_brute_force.summary": {
+		"defaultMessage": "{source} made {count} unauthorised requests against {host}."
+	},
+	"security.finding.error_spike": {
+		"defaultMessage": "Server error spike"
+	},
+	"security.finding.error_spike.summary": {
+		"defaultMessage": "{host} served {count} server errors in one hour, against a baseline of {baseline} per hour."
+	},
+	"security.finding.forced_browsing": {
+		"defaultMessage": "Forced browsing"
+	},
+	"security.finding.forced_browsing.summary": {
+		"defaultMessage": "{source} was refused {count} times, usually by an access list."
+	},
+	"security.finding.path_scanning": {
+		"defaultMessage": "Path scanning"
+	},
+	"security.finding.path_scanning.summary": {
+		"defaultMessage": "{source} requested {uris} distinct missing paths across {hosts, plural, one {# proxy host} other {# proxy hosts}}."
+	},
+	"security.finding.rate_limit_tripping": {
+		"defaultMessage": "Rate limit tripping"
+	},
+	"security.finding.rate_limit_tripping.summary": {
+		"defaultMessage": "{source} was rate limited {count} times."
+	},
+	"security.finding.rule_match_campaign": {
+		"defaultMessage": "Rule-match campaign"
+	},
+	"security.finding.rule_match_campaign.summary": {
+		"defaultMessage": "{source} matched {rules} distinct detection rules."
+	},
+	"security.finding.scanner_tooling": {
+		"defaultMessage": "Scanner tooling"
+	},
+	"security.finding.scanner_tooling.summary": {
+		"defaultMessage": "{source} identified itself as scanning software on {count} requests."
+	},
+	"security.findings": {
+		"defaultMessage": "Findings"
+	},
+	"security.findings-empty": {
+		"defaultMessage": "No behavioural patterns stand out in this window."
+	},
+	"security.findings-note": {
+		"defaultMessage": "Patterns computed over the collected events. Each one is a claim worth a look, not proof of compromise."
+	},
+	"security.findings-truncated": {
+		"defaultMessage": "Only the most severe findings are shown. Narrow the time range to see the rest."
+	},
+	"security.first-seen": {
+		"defaultMessage": "First seen"
+	},
 	"security.from": {
 		"defaultMessage": "From"
 	},
 	"security.host": {
 		"defaultMessage": "Proxy host"
+	},
+	"security.hosts-affected": {
+		"defaultMessage": "Proxy hosts affected"
 	},
 	"security.hosts-pending": {
 		"defaultMessage": "Proxy hosts not attempted"
@@ -850,6 +955,9 @@
 	},
 	"security.ingested-at": {
 		"defaultMessage": "Ingested at"
+	},
+	"security.last-seen": {
+		"defaultMessage": "Last seen"
 	},
 	"security.log-error": {
 		"defaultMessage": "Could not read the requested log."
@@ -892,6 +1000,12 @@
 	},
 	"security.nginx-upgrade-unknown": {
 		"defaultMessage": "The startup configuration check has not recorded a result yet."
+	},
+	"security.open-findings": {
+		"defaultMessage": "Open findings"
+	},
+	"security.operational": {
+		"defaultMessage": "Operational"
 	},
 	"security.overview": {
 		"defaultMessage": "Overview"
@@ -956,6 +1070,18 @@
 	"security.rule-action": {
 		"defaultMessage": "Rule action"
 	},
+	"security.rule-action.block": {
+		"defaultMessage": "Block"
+	},
+	"security.rule-action.detect": {
+		"defaultMessage": "Detect"
+	},
+	"security.rule-catalog": {
+		"defaultMessage": "Rules"
+	},
+	"security.rule-catalog-note": {
+		"defaultMessage": "Detection runs in Nginx. Blocking rules return 403 on proxy hosts with Block Common Exploits enabled; detection rules only attribute the request and never change the response."
+	},
 	"security.rule-category": {
 		"defaultMessage": "Rule category"
 	},
@@ -983,6 +1109,18 @@
 	"security.severity": {
 		"defaultMessage": "Severity"
 	},
+	"security.severity.critical": {
+		"defaultMessage": "Critical"
+	},
+	"security.severity.high": {
+		"defaultMessage": "High"
+	},
+	"security.severity.low": {
+		"defaultMessage": "Low"
+	},
+	"security.severity.medium": {
+		"defaultMessage": "Medium"
+	},
 	"security.source-ip": {
 		"defaultMessage": "Source IP"
 	},
@@ -1004,11 +1142,20 @@
 	"security.status-5xx": {
 		"defaultMessage": "5xx observations"
 	},
+	"security.subject": {
+		"defaultMessage": "Subject"
+	},
 	"security.time": {
 		"defaultMessage": "Time"
 	},
+	"security.time-range": {
+		"defaultMessage": "Time range"
+	},
 	"security.timeline": {
 		"defaultMessage": "Event timeline"
+	},
+	"security.timeline-note": {
+		"defaultMessage": "Security events by severity. Operational records are excluded."
 	},
 	"security.title": {
 		"defaultMessage": "Security"
@@ -1052,11 +1199,17 @@
 	"security.upstream-status": {
 		"defaultMessage": "Upstream status"
 	},
+	"security.urgent-findings": {
+		"defaultMessage": "{count, plural, one {# needs attention} other {# need attention}}"
+	},
 	"security.uri": {
 		"defaultMessage": "URI"
 	},
 	"security.user-agent": {
 		"defaultMessage": "User agent"
+	},
+	"security.view-evidence": {
+		"defaultMessage": "View evidence"
 	},
 	"setting": {
 		"defaultMessage": "Setting"
