@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - development
     tags:
       - "v*.*.*"
   pull_request:
@@ -174,6 +175,7 @@ jobs:
           tags: |
             type=sha,prefix=sha-
             type=ref,event=branch
+            type=raw,value=develop,enable=${{ github.ref_type == 'branch' && github.ref_name == 'development' }}
             type=raw,value=${{ steps.versions.outputs.app_version }},enable=${{ github.ref_type == 'tag' }}
             type=raw,value=upstream-${{ steps.versions.outputs.upstream_version }},enable=${{ github.ref_type == 'tag' }}
             type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
