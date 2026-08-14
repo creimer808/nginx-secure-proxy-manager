@@ -52,9 +52,27 @@ describe("security event parser", () => {
 	it("parses nginx errors and retains an unparsed line as text", () => {
 		const parsed = parseNginxErrorLine("2026/08/13 12:00:00 [error] 1#1: upstream failed", context);
 		assert.equal(parsed.nginx_error_level, "error");
-		assert.equal(parsed.severity, "high");
 		const fallback = parseNginxErrorLine("malicious <message> 日本語", context);
 		assert.equal(fallback.nginx_error_level, "unknown");
 		assert.equal(fallback.nginx_error_message, "malicious <message> 日本語");
+	});
+
+	it("keeps operational error-log records below the severity a rule match earns", () => {
+		// A flapping upstream emits thousands of these. If any of them can reach
+		// `high`, they bury the access-log detections that actually warrant it.
+		for (const [level, expected] of [["emerg", "medium"], ["alert", "medium"], ["crit", "medium"], ["error", "low"], ["warn", "low"], ["notice", "low"]]) {
+			assert.equal(parseNginxErrorLine(`2026/08/13 12:00:00 [${level}] 1#1: message`, context).severity, expected, `level ${level}`);
+		}
+		assert.equal(parseNginxErrorLine("unparseable", context).severity, "low");
+		assert.equal(parseNginxErrorLine("2026/08/13 12:00:00 [bogus] 1#1: message", context).severity, "low");
+	});
+
+	it("reads the offset-less nginx error timestamp in the same zone Nginx wrote it", () => {
+		// The format is non-ISO, so the interpretation is engine-defined rather
+		// than specified. Nginx and this process share a container and TZ, which
+		// makes a local-time reading the correct one -- pinned here because a
+		// silent shift to UTC would skew every error event by the TZ offset.
+		const parsed = parseNginxErrorLine("2026/08/13 12:00:00 [error] 1#1: upstream failed", context);
+		assert.equal(parsed.occurred_at_ms, new Date(2026, 7, 13, 12, 0, 0).getTime());
 	});
 });

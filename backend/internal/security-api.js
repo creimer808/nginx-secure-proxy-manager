@@ -25,6 +25,13 @@ const requestScans = new Map();
 let activeScans = 0;
 
 const eventTypes = new Set(["exploit_rule", "http_status", "nginx_error"]);
+/**
+ * Nginx error-log records are operational, not security findings, and they
+ * outnumber real detections by orders of magnitude on a busy proxy. They stay
+ * collected and searchable, but every security surface excludes them unless the
+ * caller asks for them explicitly.
+ */
+const OPERATIONAL_EVENT_TYPE = "nginx_error";
 const severities = new Set(["low", "medium", "high", "critical"]);
 const methods = new Set(["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "CONNECT", "TRACE"]);
 const logKinds = new Set(["access", "error", "security"]);
@@ -95,7 +102,7 @@ const authorizeHost = async (actor, hostId) => {
 const literalSearch = (builder, column, query) => builder.whereRaw(`${column} LIKE ? ESCAPE '\\'`, [`%${escapeLike(query)}%`]);
 
 const validateEventFilters = (input) => {
-	const allowed = new Set(["from", "to", "proxy_host_id", "event_type", "severity", "rule_id", "client_ip", "status", "status_class", "method", "query", "limit", "cursor"]);
+	const allowed = new Set(["from", "to", "proxy_host_id", "event_type", "severity", "rule_id", "client_ip", "status", "status_class", "method", "query", "limit", "cursor", "include_operational"]);
 	if (Object.keys(input).some((key) => !allowed.has(key))) throw new errs.ValidationError("Invalid event filter");
 	const from = parseTimestamp(input.from, "from") ?? Date.now() - 24 * 60 * 60 * 1000;
 	const to = parseTimestamp(input.to, "to") ?? Date.now();
@@ -112,7 +119,8 @@ const validateEventFilters = (input) => {
 	if (clientIp && net.isIP(clientIp) === 0) throw new errs.ValidationError("Invalid client_ip");
 	const ruleId = input.rule_id === undefined ? null : String(input.rule_id);
 	if (ruleId && (!RULE_IDS.has(ruleId) || ruleId.length > 128)) throw new errs.ValidationError("Invalid rule_id");
-	return { from, to, query, status, statusClass, hostId, clientIp, ruleId, eventType: enumFilter("event_type", eventTypes), severity: enumFilter("severity", severities), method: enumFilter("method", methods), limit: input.limit === undefined ? PAGE_DEFAULT : parseInteger(input.limit, "limit", 1, PAGE_MAX), cursor: decodeCursor(input.cursor, ["t", "i"]) };
+	const includeOperational = input.include_operational === undefined ? false : enumFilter("include_operational", new Set(["true", "false"])) === "true";
+	return { from, to, query, status, statusClass, hostId, clientIp, ruleId, includeOperational, eventType: enumFilter("event_type", eventTypes), severity: enumFilter("severity", severities), method: enumFilter("method", methods), limit: input.limit === undefined ? PAGE_DEFAULT : parseInteger(input.limit, "limit", 1, PAGE_MAX), cursor: decodeCursor(input.cursor, ["t", "i"]) };
 };
 
 const listEvents = async (access, input) => {
@@ -122,6 +130,9 @@ const listEvents = async (access, input) => {
 	const query = applyVisibleEvents(databaseFactory()("security_event as e"), actor)
 		.select("e.id", "e.event_id", "e.occurred_at_ms", "e.proxy_host_id", "e.event_type", "e.severity", "e.rule_id", "e.client_ip", "e.method", "e.request_uri", "e.status", "e.request_time_ms", "e.host_domain_snapshot")
 		.whereBetween("e.occurred_at_ms", [f.from, f.to]);
+	// Asking for event_type=nginx_error is an explicit request for operational
+	// records and is honoured on its own; the toggle only governs the default mix.
+	if (!f.includeOperational && f.eventType !== OPERATIONAL_EVENT_TYPE) query.whereNot("e.event_type", OPERATIONAL_EVENT_TYPE);
 	if (f.hostId) query.andWhere("e.proxy_host_id", f.hostId);
 	if (f.eventType) query.andWhere("e.event_type", f.eventType);
 	if (f.severity) query.andWhere("e.severity", f.severity);
@@ -154,17 +165,24 @@ const top = async (query, fields, order = "count") => (await query.select(fields
 const overview = async (access, range) => {
 	const actor = await securityAccess(access, "security:overview");
 	const since = rangeSince(range);
-	const totals = await visibleBase(actor, since).first().count("e.id as total_events").sum({ exploit_rule_matches: databaseFactory().raw("case when e.event_type = 'exploit_rule' then 1 else 0 end"), nginx_errors: databaseFactory().raw("case when e.event_type = 'nginx_error' then 1 else 0 end"), status_401: databaseFactory().raw("case when e.status = 401 then 1 else 0 end"), status_403: databaseFactory().raw("case when e.status = 403 then 1 else 0 end"), status_404: databaseFactory().raw("case when e.status = 404 then 1 else 0 end"), status_429: databaseFactory().raw("case when e.status = 429 then 1 else 0 end"), status_5xx: databaseFactory().raw("case when e.status >= 500 then 1 else 0 end") });
-	const base = () => visibleBase(actor, since);
+	const totals = await visibleBase(actor, since).first().sum({ total_events: databaseFactory().raw("case when e.event_type <> 'nginx_error' then 1 else 0 end"), operational_events: databaseFactory().raw("case when e.event_type = 'nginx_error' then 1 else 0 end"), exploit_rule_matches: databaseFactory().raw("case when e.event_type = 'exploit_rule' then 1 else 0 end"), status_401: databaseFactory().raw("case when e.status = 401 then 1 else 0 end"), status_403: databaseFactory().raw("case when e.status = 403 then 1 else 0 end"), status_404: databaseFactory().raw("case when e.status = 404 then 1 else 0 end"), status_429: databaseFactory().raw("case when e.status = 429 then 1 else 0 end"), status_5xx: databaseFactory().raw("case when e.status >= 500 then 1 else 0 end") });
+	// Every aggregate below is a *security* view. Error-log rows carry no client
+	// IP, status, method or rule, so most top-N lists already skipped them --
+	// but they do carry a proxy_host_id, which silently ranked top_hosts by
+	// error-log volume rather than by attack surface.
+	const base = () => visibleBase(actor, since).whereNot("e.event_type", OPERATIONAL_EVENT_TYPE);
 	const [timeline, topRules, topSources, topHosts, topStatuses, topMethods, newest] = await Promise.all([
 		base().select("e.event_type", "e.severity").select(databaseFactory().raw("floor(e.occurred_at_ms / 3600000) * 3600000 as bucket_start")).count("e.id as count").groupBy("bucket_start", "e.event_type", "e.severity").orderBy("bucket_start", "asc"),
-		top(base().whereNotNull("e.rule_id"), ["e.rule_id"]), top(base().whereNotNull("e.client_ip"), ["e.client_ip"]), top(base().whereNotNull("e.proxy_host_id"), ["e.proxy_host_id"]), top(base().whereNotNull("e.status"), ["e.status"]), top(base().whereNotNull("e.method"), ["e.method"]), base().max("e.occurred_at_ms as occurred_at_ms").first(),
+		top(base().whereNotNull("e.rule_id"), ["e.rule_id"]), top(base().whereNotNull("e.client_ip"), ["e.client_ip"]), top(base().whereNotNull("e.proxy_host_id"), ["e.proxy_host_id"]), top(base().whereNotNull("e.status"), ["e.status"]), top(base().whereNotNull("e.method"), ["e.method"]),
+		// Collector liveness must consider every kind of record, including the
+		// operational ones the security views exclude.
+		visibleBase(actor, since).max("e.occurred_at_ms as occurred_at_ms").first(),
 	]);
 	const num = (value) => Number(value) || 0;
 	const collector = actor.admin
 		? { ...(await databaseFactory()("security_collector_state").first() || { available: false }), enabled: process.env.SECURITY_EVENTS_ENABLED !== "false" }
 		: { available: Boolean(newest?.occurred_at_ms), lag_ms: newest?.occurred_at_ms ? Math.max(0, Date.now() - Number(newest.occurred_at_ms)) : null };
-	return { range, total_events: num(totals?.total_events), exploit_rule_matches: num(totals?.exploit_rule_matches), nginx_errors: num(totals?.nginx_errors), statuses: { "401": num(totals?.status_401), "403": num(totals?.status_403), "404": num(totals?.status_404), "429": num(totals?.status_429), "5xx": num(totals?.status_5xx) }, timeline: timeline.map((item) => ({ ...item, bucket_start: Number(item.bucket_start), count: num(item.count) })), top_rules: topRules, top_sources: topSources, top_hosts: topHosts, top_statuses: topStatuses, top_methods: topMethods, collector };
+	return { range, total_events: num(totals?.total_events), operational_events: num(totals?.operational_events), exploit_rule_matches: num(totals?.exploit_rule_matches), nginx_errors: num(totals?.operational_events), statuses: { "401": num(totals?.status_401), "403": num(totals?.status_403), "404": num(totals?.status_404), "429": num(totals?.status_429), "5xx": num(totals?.status_5xx) }, timeline: timeline.map((item) => ({ ...item, bucket_start: Number(item.bucket_start), count: num(item.count) })), top_rules: topRules, top_sources: topSources, top_hosts: topHosts, top_statuses: topStatuses, top_methods: topMethods, collector };
 };
 const rules = async (access, range) => {
 	const actor = await securityAccess(access, "security:rules");

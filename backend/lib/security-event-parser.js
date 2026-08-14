@@ -88,11 +88,28 @@ const parseSecurityAccessLine = (line, context) => {
 	return parsed;
 };
 
+/**
+ * Nginx error-log severity, mapped honestly.
+ *
+ * An error-log line is an operational observation, not a security finding. A
+ * failed TLS handshake, an upstream timeout, and a client that hung up mid-body
+ * are all routine, and one flapping upstream can emit thousands of them. Tagging
+ * those `high` -- as this did -- buries real detections under infrastructure
+ * noise, so nothing here rises above `medium`, and `high` is reserved for the
+ * access-log side where a rule actually matched.
+ */
+const NGINX_ERROR_SEVERITY = { emerg: "medium", alert: "medium", crit: "medium", error: "low", warn: "low", notice: "low", info: "low", debug: "low" };
+
 const parseNginxErrorLine = (line, context) => {
 	if (Buffer.byteLength(line, "utf8") > MAX_EVENT_BYTES) throw new Error("Nginx error event exceeds maximum size");
 	const match = /^(\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}) \[([a-z]+)\] \d+#\d+: (.*)$/i.exec(line);
+	// Nginx writes the error log in the container's local time with no offset,
+	// and this process shares that container and TZ, so a local-time parse is the
+	// matching one. security-event-parser.test.js pins that, because the format
+	// is non-ISO and the interpretation is engine-defined rather than specified.
 	const occurred = match ? Date.parse(match[1].replaceAll("/", "-")) : Date.now();
-	const event = { occurred_at_ms: Number.isFinite(occurred) ? occurred : Date.now(), proxy_host_id: context.proxyHostId, source_kind: "nginx_error", event_type: "nginx_error", severity: match && /^(?:error|alert)$/i.test(match[2]) ? "high" : "medium", nginx_error_level: match ? match[2].toLowerCase() : "unknown", nginx_error_message: match ? match[3] : line, ingest_segment_id: context.segmentId, ingest_line_offset: context.lineOffset };
+	const level = match ? match[2].toLowerCase() : "unknown";
+	const event = { occurred_at_ms: Number.isFinite(occurred) ? occurred : Date.now(), proxy_host_id: context.proxyHostId, source_kind: "nginx_error", event_type: "nginx_error", severity: NGINX_ERROR_SEVERITY[level] || "low", nginx_error_level: level, nginx_error_message: match ? match[3] : line, ingest_segment_id: context.segmentId, ingest_line_offset: context.lineOffset };
 	event.event_id = canonicalEventId(null, event);
 	return event;
 };
