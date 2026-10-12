@@ -1,6 +1,6 @@
 {
 	"name": "@cybersec-cam/nginx-secure-proxy-manager",
-	"version": "0.1.3",
+	"version": "0.1.4",
 	"type": "module",
 	"author": "CyberSec.Cam (https://www.cybersec.cam)",
 	"license": "MIT",
