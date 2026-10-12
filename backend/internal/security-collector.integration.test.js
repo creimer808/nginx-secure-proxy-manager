@@ -27,7 +27,11 @@ let discoverHosts;
 const HOST = { id: 1, domain_names: ["one.test"], owner_user_id: 3 };
 
 const securityLine = (index, overrides = {}) => {
-	const occurred = Date.UTC(2026, 7, 13, 12, 0, 0) + index * 1000;
+	// Events must stay inside the retention window (default 30 days) or the
+	// collector's retention sweep deletes them in the same transaction that
+	// commits them, which is why hardcoding a date made this suite start
+	// failing two months after it was written. "A minute ago" is always recent.
+	const occurred = Date.now() - 60_000 + index * 1000;
 	const iso = new Date(occurred).toISOString().replace(/\.\d{3}Z$/, "Z");
 	return JSON.stringify({
 		schema_version: "1", ruleset_version: "2026-08-13", request_id: `request-${index}`, timestamp: iso, msec: `${Math.floor(occurred / 1000)}.000`,
