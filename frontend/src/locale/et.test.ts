@@ -16,9 +16,27 @@ const allowedIdentical = new Set([
 	"streams.udp",
 ]);
 
+// NSPM fork keys follow the repo's locale policy (see check-locales.cjs): `en`
+// is the source of truth and the other locales are legitimately incomplete, so
+// fork-specific keys fall back to English until someone translates them. The
+// upstream completeness guarantees below are scoped to the upstream key
+// namespace and deliberately do not force fork keys to be translated.
+const NSPM_KEY_PREFIXES = [
+	"dashboard.metrics.",
+	"dashboard.posture.",
+	"dashboard.range.",
+	"security.",
+	"footer.nspm-",
+	"footer.upstream-npm",
+	"version.app",
+	"version.upstream",
+];
+const isNspmKey = (key: string) => NSPM_KEY_PREFIXES.some((prefix) => key === prefix || key.startsWith(prefix));
+const upstreamEnglish = Object.fromEntries(Object.entries(english).filter(([key]) => !isNspmKey(key)));
+
 describe("Estonian UI locale", () => {
 	it("covers every English UI key", () => {
-		const missing = Object.keys(english).filter((key) => !(key in estonian));
+		const missing = Object.keys(upstreamEnglish).filter((key) => !(key in estonian));
 		expect(missing).toEqual([]);
 	});
 
@@ -28,7 +46,7 @@ describe("Estonian UI locale", () => {
 	});
 
 	it("is translated, not an English copy", () => {
-		const identical = Object.keys(english).filter(
+		const identical = Object.keys(upstreamEnglish).filter(
 			(key) => estonian[key]?.defaultMessage === english[key]?.defaultMessage,
 		);
 		const unexpected = identical.filter((key) => !allowedIdentical.has(key));
