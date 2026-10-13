@@ -27,7 +27,10 @@ let discoverHosts;
 const HOST = { id: 1, domain_names: ["one.test"], owner_user_id: 3 };
 
 const securityLine = (index, overrides = {}) => {
-	const occurred = Date.UTC(2026, 7, 13, 12, 0, 0) + index * 1000;
+	// Anchored to now: the write transaction's retention pass deletes events
+	// older than the retention window, so a fixed date eventually makes every
+	// freshly-ingested event vanish before the assertion reads it back.
+	const occurred = Date.now() - 60_000 + index * 1000;
 	const iso = new Date(occurred).toISOString().replace(/\.\d{3}Z$/, "Z");
 	return JSON.stringify({
 		schema_version: "1", ruleset_version: "2026-08-13", request_id: `request-${index}`, timestamp: iso, msec: `${Math.floor(occurred / 1000)}.000`,
