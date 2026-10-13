@@ -6,7 +6,7 @@ Only the latest stable **Nginx Secure Proxy Manager** release is supported with 
 
 | NSPM version | Upstream compatibility baseline | Supported |
 | --- | --- | --- |
-| 0.1.x | Nginx Proxy Manager 2.15.x | :white_check_mark: |
+| 0.1.x | Nginx Proxy Manager 2.16.x | :white_check_mark: |
 | Older NSPM releases | Any | :x: |
 
 Images are published at `ghcr.io/creimer808/nginx-proxy-manager`. Pin an NSPM image digest in production. Protect GitHub release tags and keep GHCR numeric tags immutable; `latest` is intentionally mutable. An upstream NPM release notification indicates a compatibility update to review, not an NSPM image release.

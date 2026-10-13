@@ -1,7 +1,8 @@
-import { createColumnHelper, getCoreRowModel, useReactTable } from "@tanstack/react-table";
+import { createColumnHelper, useTable } from "@tanstack/react-table";
 import { useMemo, useState } from "react";
 import type { SecurityEvent, SecurityEventFilters, SecurityEventType, SecuritySeverity } from "src/api/backend";
 import { Loading, QueryError, SeverityBadge } from "src/components";
+import { type Features, features } from "src/components/Table/features";
 import { TableLayout } from "src/components/Table/TableLayout";
 import { useSecurityEvents } from "src/hooks";
 import { intl, T } from "src/locale";
@@ -13,49 +14,49 @@ import styles from "./Logs.module.css";
 const toNumber = (value: string | null): number | undefined =>
 	value && /^\d+$/.test(value) ? Number(value) : undefined;
 
-const columnHelper = createColumnHelper<SecurityEvent>();
+const columnHelper = createColumnHelper<Features, SecurityEvent>();
 
 const useColumns = () =>
 	useMemo(
 		() => [
-			columnHelper.accessor("occurredAtMs", {
+			columnHelper.accessor((row: any) => row.occurredAtMs, {
 				header: intl.formatMessage({ id: "security.time" }),
 				cell: (info) => <span className="text-nowrap">{formatDateTime(info.getValue())}</span>,
 			}),
-			columnHelper.accessor("severity", {
+			columnHelper.accessor((row: any) => row.severity, {
 				header: intl.formatMessage({ id: "security.severity" }),
 				cell: (info) => <SeverityBadge severity={info.getValue()} />,
 				meta: { className: "w-1" },
 			}),
-			columnHelper.accessor("eventType", {
+			columnHelper.accessor((row: any) => row.eventType, {
 				header: intl.formatMessage({ id: "security.type" }),
 				cell: (info) => info.getValue(),
 			}),
-			columnHelper.accessor("ruleId", {
+			columnHelper.accessor((row: any) => row.ruleId, {
 				header: intl.formatMessage({ id: "security.rule" }),
 				cell: (info) => <span className="font-monospace">{stringValue(info.getValue())}</span>,
 			}),
-			columnHelper.accessor("clientIp", {
+			columnHelper.accessor((row: any) => row.clientIp, {
 				header: intl.formatMessage({ id: "security.source-ip" }),
 				cell: (info) => <span className="font-monospace text-nowrap">{stringValue(info.getValue())}</span>,
 			}),
-			columnHelper.accessor("hostDomainSnapshot", {
+			columnHelper.accessor((row: any) => row.hostDomainSnapshot, {
 				header: intl.formatMessage({ id: "security.host" }),
 				cell: (info) => stringValue(info.getValue()),
 			}),
-			columnHelper.accessor("method", {
+			columnHelper.accessor((row: any) => row.method, {
 				header: intl.formatMessage({ id: "security.method" }),
 				cell: (info) => stringValue(info.getValue()),
 			}),
-			columnHelper.accessor("requestUri", {
+			columnHelper.accessor((row: any) => row.requestUri, {
 				header: intl.formatMessage({ id: "security.uri" }),
 				cell: (info) => <span className={styles.uriCell}>{stringValue(info.getValue())}</span>,
 			}),
-			columnHelper.accessor("userAgent", {
+			columnHelper.accessor((row: any) => row.userAgent, {
 				header: intl.formatMessage({ id: "security.user-agent" }),
 				cell: (info) => <span className={styles.uriCell}>{stringValue(info.getValue())}</span>,
 			}),
-			columnHelper.accessor("status", {
+			columnHelper.accessor((row: any) => row.status, {
 				header: intl.formatMessage({ id: "security.status" }),
 				cell: (info) => stringValue(info.getValue()),
 			}),
@@ -110,11 +111,10 @@ function Events({ params, update }: EventsProps) {
 	const ready = Boolean(params.get("from") && params.get("to"));
 	const { data, isLoading, isError, refetch, isFetching } = useSecurityEvents(filters, ready);
 	const columns = useColumns();
-	const table = useReactTable<SecurityEvent>({
+	const table = useTable({
+		features,
 		columns,
 		data: data?.items ?? [],
-		getCoreRowModel: getCoreRowModel(),
-		rowCount: data?.items.length ?? 0,
 		meta: { isFetching },
 		enableSortingRemoval: false,
 	});
