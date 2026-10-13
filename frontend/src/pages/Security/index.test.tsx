@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { hasPermission, PROXY_HOSTS, VIEW } from "src/modules/Permissions";
@@ -26,12 +26,18 @@ const finding = {
 	metrics: { distinctUris: 412, distinctHosts: 3 },
 	filter: { clientIp: "203.0.113.9", status: 404, from: 1, to: 2 },
 };
-const hooks = vi.hoisted(() => ({ roles: ["admin"], nginxUpgrade: null as null | Record<string, unknown> }));
+const hooks = vi.hoisted(() => ({
+	roles: ["admin"],
+	nginxUpgrade: null as null | Record<string, unknown>,
+	securityOverview: vi.fn(),
+	securityFindings: vi.fn(),
+}));
 vi.mock("src/hooks", () => ({
 	useNoReferrer: () => undefined,
 	useUser: () => ({ data: { roles: hooks.roles, permissions: { proxyHosts: "view" } }, isLoading: false }),
 	useProxyHosts: () => ({ data: [{ id: 7, domainNames: ["example.test"] }] }),
-	useSecurityOverview: () => ({
+	useAccessLists: () => ({ data: [{ id: 7, name: "Office", ownerUserId: 1, meta: {}, satisfyAny: false, passAuth: false }], isLoading: false }),
+	useSecurityOverview: hooks.securityOverview.mockImplementation(() => ({
 		data: {
 			range: "24h",
 			totalEvents: 2,
@@ -52,8 +58,8 @@ vi.mock("src/hooks", () => ({
 		isLoading: false,
 		isError: false,
 		refetch: vi.fn(),
-	}),
-	useSecurityFindings: () => ({
+	})),
+	useSecurityFindings: hooks.securityFindings.mockImplementation(() => ({
 		data: {
 			range: "24h",
 			generatedAt: 0,
@@ -65,7 +71,7 @@ vi.mock("src/hooks", () => ({
 		isLoading: false,
 		isError: false,
 		refetch: vi.fn(),
-	}),
+	})),
 	useSecurityRules: () => ({
 		data: [
 			{
@@ -119,6 +125,7 @@ describe("Security page", () => {
 		cleanup();
 		hooks.roles = ["admin"];
 		hooks.nginxUpgrade = null;
+		vi.clearAllMocks();
 	});
 
 	it("denies page navigation when proxy host view permission is hidden", () => {
@@ -151,6 +158,23 @@ describe("Security page", () => {
 		const evidence = screen.getByRole("link", { name: /View evidence/ });
 		expect(evidence).toHaveAttribute("href", expect.stringContaining("clientIp=203.0.113.9"));
 		expect(evidence).toHaveAttribute("href", expect.stringContaining("status=404"));
+	});
+
+	it("narrows overview and findings to the selected access list", async () => {
+		renderPage();
+		await waitFor(() => {
+			expect(screen.getByText("Path scanning")).toBeInTheDocument();
+		});
+		expect(hooks.securityOverview).toHaveBeenCalledWith("24h", undefined);
+		expect(hooks.securityFindings).toHaveBeenCalledWith("24h", undefined);
+
+		fireEvent.change(screen.getByRole("combobox", { name: "Access list" }), { target: { value: "7" } });
+
+		await waitFor(() => {
+			expect(hooks.securityOverview).toHaveBeenLastCalledWith("24h", 7);
+		});
+		expect(hooks.securityFindings).toHaveBeenLastCalledWith("24h", 7);
+		expect(screen.getByRole("option", { name: "Office" })).toBeInTheDocument();
 	});
 
 	it("keeps healthy collector status to a pill rather than a standing banner", () => {

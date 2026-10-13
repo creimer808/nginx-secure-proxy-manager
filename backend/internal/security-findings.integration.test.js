@@ -57,12 +57,13 @@ before(async () => {
 		table.integer("id").primary();
 		table.integer("owner_user_id").notNullable();
 		table.integer("is_deleted").notNullable().defaultTo(0);
+		table.integer("access_list_id").notNullable().defaultTo(0);
 	});
 	await securityMigrationUp(database);
 	await progressMigrationUp(database);
 	await database("proxy_host").insert([
-		{ id: 1, owner_user_id: 10 },
-		{ id: 2, owner_user_id: 20 },
+		{ id: 1, owner_user_id: 10, access_list_id: 5 },
+		{ id: 2, owner_user_id: 20, access_list_id: 0 },
 	]);
 });
 
@@ -158,6 +159,24 @@ describe("behavioural security findings", () => {
 		assert.equal(spikes[0].operational, true);
 		assert.equal(spikes[0].filter.status_class, "5xx");
 		assert.ok(report.findings.every((finding) => finding.type !== "error_spike" || finding.operational));
+	});
+
+	it("narrowing by access list raises findings only for hosts in the list and records the filter", async () => {
+		await insert(repeat(THRESHOLDS.bruteForceAttempts, () => ({ client_ip: "203.0.113.20", status: 401, proxy_host_id: 1, host_domain_snapshot: "one.test" })));
+		await insert(repeat(THRESHOLDS.bruteForceAttempts, () => ({ client_ip: "203.0.113.21", status: 401, proxy_host_id: 2, host_domain_snapshot: "two.test" })));
+
+		const report = await findings(access({ userId: 1, admin: true }), "24h", 5);
+		const brute = byType(report, "credential_brute_force");
+		assert.equal(brute.length, 1, "host 2 has no access list and must not appear");
+		assert.equal(brute[0].subject.proxy_host_id, 1);
+		assert.equal(brute[0].filter.access_list_id, 5, "evidence links must reproduce the filtered count");
+
+		// Without the filter both hosts surface, and no filter is recorded.
+		const unfiltered = byType(await findings(access({ userId: 1, admin: true }), "24h"), "credential_brute_force");
+		assert.equal(unfiltered.length, 2);
+		assert.ok(unfiltered.every((finding) => finding.filter.access_list_id === undefined));
+
+		await assert.rejects(() => findings(access({ userId: 1, admin: true }), "24h", "abc"), { status: 400 });
 	});
 
 	it("keeps operational error-log records out of every behavioural detector", async () => {

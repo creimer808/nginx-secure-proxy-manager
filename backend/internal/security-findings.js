@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createMemo } from "../lib/security-memo.js";
 import { SECURITY_RULES } from "../lib/security-rule-catalog.js";
-import { applyVisibleEvents, rangeSince, registerSecurityCache, securityAccess, securityDatabase } from "./security-api.js";
+import { applyVisibleEvents, parseAccessListId, rangeSince, registerSecurityCache, securityAccess, securityDatabase } from "./security-api.js";
 
 /**
  * Behavioural findings.
@@ -23,7 +23,7 @@ import { applyVisibleEvents, rangeSince, registerSecurityCache, securityAccess, 
  */
 
 const findingsCache = registerSecurityCache(createMemo({ ttlMs: 30_000, maxEntries: 200 }));
-const findingsCacheKey = (actor, range) => JSON.stringify([actor.admin, actor.visibility, actor.userId, range]);
+const findingsCacheKey = (actor, range, listId) => JSON.stringify([actor.admin, actor.visibility, actor.userId, range, listId ?? null]);
 
 /** Nginx error-log records are operational; every detector but the error spike ignores them. */
 const OPERATIONAL_EVENT_TYPE = "nginx_error";
@@ -87,19 +87,23 @@ const build = ({ type, key, range, severity, row, subject, metrics, filter, oper
 	filter,
 });
 
-const findings = async (access, range) => {
+const findings = async (access, range, accessListId) => {
 	const actor = await securityAccess(access, "security:findings");
-	// Authorization and range validation stay ahead of the memo, so neither a
-	// revoked permission nor a bad range can be served from it.
+	// Authorization, range, and filter validation stay ahead of the memo, so
+	// neither a revoked permission nor a bad input can be served from it.
+	const listId = parseAccessListId(accessListId);
 	const since = rangeSince(range);
-	const cacheKey = findingsCacheKey(actor, range);
+	const cacheKey = findingsCacheKey(actor, range, listId);
 	const cached = findingsCache.read(cacheKey);
 	if (cached) return cached;
 
 	const db = securityDatabase();
 	const until = Date.now();
 	const window = { from: since, to: until };
-	const base = () => applyVisibleEvents(db("security_event as e"), actor).where("e.occurred_at_ms", ">=", since).whereNot("e.event_type", OPERATIONAL_EVENT_TYPE);
+	const base = () => {
+		const query = applyVisibleEvents(db("security_event as e"), actor).where("e.occurred_at_ms", ">=", since).whereNot("e.event_type", OPERATIONAL_EVENT_TYPE);
+		return listId ? query.andWhere("p.access_list_id", listId) : query;
+	};
 	/** Every detector wants the same four aggregates; only the grouping differs. */
 	const withSpan = (query) => query.count("e.id as evidence_count").min("e.occurred_at_ms as first_seen").max("e.occurred_at_ms as last_seen");
 	const bySource = (query) => withSpan(query.whereNotNull("e.client_ip").select("e.client_ip").groupBy("e.client_ip")).orderBy("evidence_count", "desc").limit(MAX_FINDINGS_PER_TYPE);
@@ -132,14 +136,17 @@ const findings = async (access, range) => {
 		// The spike detector needs the per-hour shape, not a single total, so it
 		// is the one query that aggregates twice: buckets here, baseline in JS.
 		withSpan(
-			applyVisibleEvents(db("security_event as e"), actor)
-				.where("e.occurred_at_ms", ">=", since)
-				.where("e.status", ">=", 500)
-				.whereNotNull("e.proxy_host_id")
-				.select("e.proxy_host_id")
-				.max("e.host_domain_snapshot as host_domain")
-				.select(db.raw("floor(e.occurred_at_ms / ?) as bucket", [HOUR_MS]))
-				.groupBy("e.proxy_host_id", "bucket"),
+			(() => {
+				const query = applyVisibleEvents(db("security_event as e"), actor)
+					.where("e.occurred_at_ms", ">=", since)
+					.where("e.status", ">=", 500)
+					.whereNotNull("e.proxy_host_id");
+				return (listId ? query.andWhere("p.access_list_id", listId) : query)
+					.select("e.proxy_host_id")
+					.max("e.host_domain_snapshot as host_domain")
+					.select(db.raw("floor(e.occurred_at_ms / ?) as bucket", [HOUR_MS]))
+					.groupBy("e.proxy_host_id", "bucket");
+			})(),
 		),
 	]);
 
@@ -236,6 +243,11 @@ const findings = async (access, range) => {
 	}
 
 	const rank = (finding) => SEVERITIES.indexOf(finding.severity);
+	// When computed under an access-list filter, the evidence link must carry the
+	// same filter: the logs view has to reproduce exactly the rows that were counted.
+	if (listId) {
+		for (const finding of results) finding.filter = { ...finding.filter, access_list_id: listId };
+	}
 	results.sort((a, b) => rank(b) - rank(a) || b.evidence_count - a.evidence_count || a.id.localeCompare(b.id));
 	const report = {
 		range,

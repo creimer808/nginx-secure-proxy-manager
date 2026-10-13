@@ -45,4 +45,12 @@ describe("security API validation and visibility", () => {
 		assert.equal(filters.status, null);
 		assert.equal(filters.statusClass, "5xx");
 	});
+
+	it("narrowing by access list validates the identifier", () => {
+		assert.equal(validateEventFilters({ access_list_id: "5" }).accessListId, 5);
+		assert.equal(validateEventFilters({}).accessListId, null);
+		for (const bad of [{ access_list_id: "0" }, { access_list_id: "abc" }, { access_list_id: "-1" }]) {
+			assert.throws(() => validateEventFilters(bad), { status: 400 });
+		}
+	});
 });

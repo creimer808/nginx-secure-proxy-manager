@@ -61,6 +61,7 @@ before(async () => {
 		table.integer("id").primary();
 		table.integer("owner_user_id").notNullable();
 		table.integer("is_deleted").notNullable().defaultTo(0);
+		table.integer("access_list_id").notNullable().defaultTo(0);
 	});
 	await database.schema.createTable("setting", (table) => { table.string("id").primary(); table.string("value").notNullable(); });
 	await database.schema.createTable("audit_log", (table) => {
@@ -149,6 +150,32 @@ describe("security API database-backed authorization and raw-log boundaries", ()
 		// both settled before the memo is consulted.
 		await assert.rejects(() => overview(access({ userId: 60, allowed: false }), "24h"), { status: 403 });
 		await assert.rejects(() => overview(actor, "90d"), { status: 400 });
+	});
+
+	it("narrowing by access list filters overview, events, and stays out of the wrong memo entry", async () => {
+		await database("proxy_host").insert([
+			{ id: 41, owner_user_id: 40, access_list_id: 5 },
+			{ id: 42, owner_user_id: 40, access_list_id: 0 },
+		]);
+		await database("security_event").insert([
+			event({ id: 40, event_id: "event-00000000000040", proxy_host_id: 41, ingest_line_offset: 40 }),
+			event({ id: 41, event_id: "event-00000000000041", proxy_host_id: 42, ingest_line_offset: 41 }),
+		]);
+		const actor = access({ userId: 40 });
+		const window = { from: String(now - 1), to: String(now + 1) };
+
+		const filtered = await overview(actor, "24h", 5);
+		assert.equal(filtered.total_events, 1);
+		assert.deepEqual(filtered.distinct_hosts, 1);
+		// A different filter inside the memo TTL is a different question.
+		assert.equal((await overview(actor, "24h")).total_events, 2);
+		assert.equal((await overview(actor, "24h", 5)).total_events, 1, "the filtered entry must survive the unfiltered one");
+		await assert.rejects(() => overview(actor, "24h", "abc"), { status: 400 });
+
+		const ids = (result) => result.items.map((row) => row.id).sort((a, b) => a - b);
+		assert.deepEqual(ids(await listEvents(actor, { ...window, access_list_id: "5" })), [40]);
+		assert.deepEqual(ids(await listEvents(actor, window)), [40, 41]);
+		await assert.rejects(() => listEvents(actor, { ...window, access_list_id: "nope" }), { status: 400 });
 	});
 
 	it("resolves only authorized allowlisted raw files and prevents global, symlink, hardlink, rotation, and cursor bypasses", async () => {

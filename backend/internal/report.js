@@ -1,11 +1,34 @@
 import moment from "moment";
 import db from "../db.js";
+import errs from "../lib/error.js";
 import { groupSeriesByDay, normalizeDomain, rangeToSince, toSeriesEntry } from "../lib/dashboard-report-helpers.js";
 import { dayBucket } from "../lib/nginx-access-log-parser.js";
 import internalDeadHost from "./dead-host.js";
 import internalProxyHost from "./proxy-host.js";
 import internalRedirectionHost from "./redirection-host.js";
 import internalStream from "./stream.js";
+
+let databaseFactory = db;
+
+/** Test-only seam mirrors security-api so queries run against an isolated database. */
+const configureReportForTesting = ({ database } = {}) => {
+	databaseFactory = database ? () => database : db;
+};
+const resetReportTestState = () => {
+	databaseFactory = db;
+};
+
+/**
+ * The access-list filter arrives from the query string, so it is validated the
+ * same way event filters are: a positive integer or nothing at all.
+ */
+const parseAccessListId = (accessListId) => {
+	if (accessListId === undefined || accessListId === null || accessListId === "") return null;
+	if (!/^\d+$/.test(String(accessListId))) throw new errs.ValidationError("Invalid access_list_id");
+	const id = Number(accessListId);
+	if (!Number.isSafeInteger(id) || id < 1) throw new errs.ValidationError("Invalid access_list_id");
+	return id;
+};
 
 const internalReport = {
 	/**
@@ -44,17 +67,19 @@ const internalReport = {
 	 * always joined to active proxy_host rows and, when the user does not have
 	 * global visibility, filtered by owner_user_id. Frontend filtering is UX only.
 	 *
-	 * @param  {Access} access
-	 * @param  {string} range One of: 24h, 7d, 30d
+	 * @param  {Access}  access
+	 * @param  {string}  range One of: 24h, 7d, 30d
+	 * @param  {number}  [accessListId] Narrow every metric to hosts in this access list.
 	 * @return {Promise<Object>}
 	 */
-	getDashboardReport: async (access, range) => {
+	getDashboardReport: async (access, range, accessListId) => {
 		const accessData = await access.can("reports:dashboard", 1);
 		const visibility = accessData.permission_visibility;
 		const userId = access.token.getUserId(1);
 		const since = rangeToSince(range);
 		const nowEpoch = Math.floor(Date.now() / 1000);
 		const num = (v) => Number(v) || 0;
+		const listId = parseAccessListId(accessListId);
 
 		const applyVisibility = (query, ownerColumn = "owner_user_id") => {
 			if (visibility !== "all") {
@@ -66,10 +91,11 @@ const internalReport = {
 		// --- Posture: configuration counts over visible active proxy hosts. ---
 		// Computed in application code to avoid database-specific conditional aggregates.
 		const hostQuery = applyVisibility(
-			db()("proxy_host")
+			databaseFactory()("proxy_host")
 				.select("enabled", "certificate_id", "ssl_forced", "block_exploits", "hsts_enabled", "access_list_id")
 				.where("is_deleted", 0),
 		);
+		if (listId) hostQuery.andWhere("access_list_id", listId);
 		const hostRows = await hostQuery;
 
 		let enabled = 0;
@@ -113,13 +139,14 @@ const internalReport = {
 		// --- Certificate posture over certificates used by visible hosts. ---
 		// Normalize driver values because SQLite returns date text while MySQL and
 		// PostgreSQL may return Date objects.
-		let certQuery = db()("certificate as c")
+		let certQuery = databaseFactory()("certificate as c")
 			.join("proxy_host as p", "p.certificate_id", "c.id")
 			.where("p.is_deleted", 0)
 			.andWhere("c.is_deleted", 0)
 			.groupBy("c.id", "c.expires_on")
 			.select("c.expires_on");
 		certQuery = applyVisibility(certQuery, "p.owner_user_id");
+		if (listId) certQuery.andWhere("p.access_list_id", listId);
 		const certRows = await certQuery;
 
 		const nowMillis = Date.now();
@@ -174,11 +201,13 @@ const internalReport = {
 		}
 
 		// --- Traffic totals over visible hosts within the range. ---
-		const trafficBase = () =>
-			db()("proxy_host_traffic_hourly as t")
+		const trafficBase = () => {
+			const query = databaseFactory()("proxy_host_traffic_hourly as t")
 				.join("proxy_host as p", "p.id", "t.proxy_host_id")
 				.where("p.is_deleted", 0)
 				.andWhere("t.bucket_start", ">=", since);
+			return listId ? query.andWhere("p.access_list_id", listId) : query;
+		};
 
 		let totalsQuery = trafficBase();
 		totalsQuery = applyVisibility(totalsQuery, "p.owner_user_id");
@@ -241,7 +270,7 @@ const internalReport = {
 		let domainById = {};
 		if (topHostIds.length) {
 			const domainQuery = applyVisibility(
-				db()("proxy_host").select("id", "domain_names").whereIn("id", topHostIds).where("is_deleted", 0),
+				databaseFactory()("proxy_host").select("id", "domain_names").whereIn("id", topHostIds).where("is_deleted", 0),
 			);
 			const domainRows = await domainQuery;
 			domainById = Object.fromEntries(domainRows.map((r) => [r.id, normalizeDomain(r.domain_names)]));
@@ -259,11 +288,13 @@ const internalReport = {
 		// Source rows are daily aggregates, so include the UTC boundary day. Exact
 		// sub-day filtering is intentionally unavailable because requests are never stored.
 		const sourceSince = dayBucket(since);
-		const sourceBase = () =>
-			db()("proxy_host_source_daily as s")
+		const sourceBase = () => {
+			const query = databaseFactory()("proxy_host_source_daily as s")
 				.join("proxy_host as p", "p.id", "s.proxy_host_id")
 				.where("p.is_deleted", 0)
 				.andWhere("s.bucket_start", ">=", sourceSince);
+			return listId ? query.andWhere("p.access_list_id", listId) : query;
+		};
 
 		let topSourcesQuery = sourceBase();
 		topSourcesQuery = applyVisibility(topSourcesQuery, "p.owner_user_id");
@@ -284,7 +315,7 @@ const internalReport = {
 		const sourceDomainById = {};
 		if (sourceHostIds.length) {
 			const sourceDomainQuery = applyVisibility(
-				db()("proxy_host").select("id", "domain_names").whereIn("id", sourceHostIds).where("is_deleted", 0),
+				databaseFactory()("proxy_host").select("id", "domain_names").whereIn("id", sourceHostIds).where("is_deleted", 0),
 			);
 			const sourceDomainRows = await sourceDomainQuery;
 			for (const row of sourceDomainRows) {
@@ -320,3 +351,4 @@ const internalReport = {
 };
 
 export default internalReport;
+export { configureReportForTesting, resetReportTestState };

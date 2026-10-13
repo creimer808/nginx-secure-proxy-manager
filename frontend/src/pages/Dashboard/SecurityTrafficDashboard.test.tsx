@@ -9,10 +9,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("src/api/backend", async () => {
 	const actual = await vi.importActual<typeof import("src/api/backend")>("src/api/backend");
 	const getDashboardReport = vi.fn();
+	const getAccessLists = vi.fn().mockResolvedValue([{ id: 7, name: "Office", ownerUserId: 1, meta: {}, satisfyAny: false, passAuth: false }]);
 	// The open-findings tile reads a different endpoint; this suite is about the
 	// traffic report, so the findings read is stubbed empty rather than exercised.
 	const getSecurityFindings = vi.fn().mockResolvedValue({ range: "24h", generatedAt: 0, window: { from: 0, to: 0 }, counts: { low: 0, medium: 0, high: 0, critical: 0 }, truncated: false, findings: [] });
-	return { ...actual, getDashboardReport, getSecurityFindings };
+	return { ...actual, getDashboardReport, getAccessLists, getSecurityFindings };
 });
 
 const { getDashboardReport } = await import("src/api/backend");
@@ -117,7 +118,7 @@ describe("SecurityTrafficDashboard", () => {
 		mockedGetDashboardReport.mockResolvedValue(sampleReport());
 		renderWithClient();
 
-		expect(mockedGetDashboardReport).toHaveBeenCalledWith("24h", expect.anything());
+		expect(mockedGetDashboardReport).toHaveBeenCalledWith("24h", undefined, expect.anything());
 		await waitFor(() => {
 			expect(screen.getAllByText("185,430").length).toBeGreaterThan(0);
 		});
@@ -175,7 +176,7 @@ describe("SecurityTrafficDashboard", () => {
 		fireEvent.click(sevenDayButton as HTMLElement);
 
 		await waitFor(() => {
-			expect(mockedGetDashboardReport).toHaveBeenLastCalledWith("7d", expect.anything());
+			expect(mockedGetDashboardReport).toHaveBeenLastCalledWith("7d", undefined, expect.anything());
 		});
 		expect(screen.getByRole("img", { name: "Historical trend" })).toHaveAttribute("data-range", "24h");
 
@@ -247,6 +248,25 @@ describe("SecurityTrafficDashboard", () => {
 			expect(screen.getByText("Could not load security & traffic metrics.")).toBeInTheDocument();
 		});
 		expect(screen.getAllByText("185,430").length).toBeGreaterThan(0);
+	});
+
+	it("narrows the report to the selected access list", async () => {
+		mockedGetDashboardReport.mockResolvedValue(sampleReport());
+		renderWithClient();
+
+		await waitFor(() => {
+			expect(screen.getAllByText("185,430").length).toBeGreaterThan(0);
+		});
+		expect(mockedGetDashboardReport).toHaveBeenCalledWith("24h", undefined, expect.anything());
+
+		fireEvent.change(screen.getByRole("combobox", { name: "Access list" }), { target: { value: "7" } });
+
+		await waitFor(() => {
+			expect(mockedGetDashboardReport).toHaveBeenLastCalledWith("24h", 7, expect.anything());
+		});
+		// The selector offers every access list plus the unfiltered default.
+		expect(screen.getByRole("option", { name: "All hosts" }).tagName).toBe("OPTION");
+		expect(screen.getByRole("option", { name: "Office" }).tagName).toBe("OPTION");
 	});
 
 	it("shows the disabled note when collection is disabled", async () => {

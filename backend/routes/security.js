@@ -16,8 +16,8 @@ const handler = (fn) => async (req, res, next) => {
 };
 router.use(jwtdecode());
 router.use(secureHeaders);
-router.route("/overview").options((_, res) => res.sendStatus(204)).get(handler((req, res) => overview(res.locals.access, req.query.range)));
-router.route("/findings").options((_, res) => res.sendStatus(204)).get(handler((req, res) => findings(res.locals.access, req.query.range)));
+router.route("/overview").options((_, res) => res.sendStatus(204)).get(handler((req, res) => overview(res.locals.access, req.query.range, req.query.access_list_id)));
+router.route("/findings").options((_, res) => res.sendStatus(204)).get(handler((req, res) => findings(res.locals.access, req.query.range, req.query.access_list_id)));
 router.route("/events").options((_, res) => res.sendStatus(204)).get(handler((req, res) => listEvents(res.locals.access, req.query)));
 router.route("/events/:event_id").options((_, res) => res.sendStatus(204)).get(handler((req, res) => getEvent(res.locals.access, req.params.event_id)));
 router.route("/rules").options((_, res) => res.sendStatus(204)).get(handler((req, res) => rules(res.locals.access, req.query.range)));

@@ -59,6 +59,12 @@
 	"access-list": {
 		"defaultMessage": "Access List"
 	},
+	"access-list-filter.all": {
+		"defaultMessage": "All hosts"
+	},
+	"access-list-filter.label": {
+		"defaultMessage": "Access list"
+	},
 	"access-list.access-count": {
 		"defaultMessage": "{count} {count, plural, one {Rule} other {Rules}}"
 	},

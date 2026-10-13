@@ -55,6 +55,8 @@ const parseInteger = (value, name, min, max) => {
 	if (!Number.isSafeInteger(n) || n < min || n > max) throw new errs.ValidationError(`Invalid ${name}`);
 	return n;
 };
+/** Absent means unfiltered; anything present must be a positive integer. Shared with the findings module. */
+const parseAccessListId = (value) => (value === undefined || value === null || value === "" ? null : parseInteger(value, "access_list_id", 1, Number.MAX_SAFE_INTEGER));
 const parseTimestamp = (value, name) => {
 	if (value === undefined) return null;
 	const time = /^\d+$/.test(String(value)) ? Number(value) : Date.parse(String(value));
@@ -103,7 +105,7 @@ const authorizeHost = async (actor, hostId) => {
 const literalSearch = (builder, column, query) => builder.whereRaw(`${column} LIKE ? ESCAPE '\\'`, [`%${escapeLike(query)}%`]);
 
 const validateEventFilters = (input) => {
-	const allowed = new Set(["from", "to", "proxy_host_id", "event_type", "severity", "rule_id", "client_ip", "status", "status_class", "method", "query", "limit", "cursor", "include_operational"]);
+	const allowed = new Set(["from", "to", "proxy_host_id", "access_list_id", "event_type", "severity", "rule_id", "client_ip", "status", "status_class", "method", "query", "limit", "cursor", "include_operational"]);
 	if (Object.keys(input).some((key) => !allowed.has(key))) throw new errs.ValidationError("Invalid event filter");
 	const from = parseTimestamp(input.from, "from") ?? Date.now() - 24 * 60 * 60 * 1000;
 	const to = parseTimestamp(input.to, "to") ?? Date.now();
@@ -116,12 +118,13 @@ const validateEventFilters = (input) => {
 	if (statusClass !== null && statusClass !== "5xx") throw new errs.ValidationError("Invalid status_class");
 	if (status !== null && statusClass !== null) throw new errs.ValidationError("Status and status_class cannot be combined");
 	const hostId = input.proxy_host_id === undefined ? null : parseInteger(input.proxy_host_id, "proxy_host_id", 1, Number.MAX_SAFE_INTEGER);
+	const accessListId = parseAccessListId(input.access_list_id);
 	const clientIp = input.client_ip === undefined ? null : String(input.client_ip);
 	if (clientIp && net.isIP(clientIp) === 0) throw new errs.ValidationError("Invalid client_ip");
 	const ruleId = input.rule_id === undefined ? null : String(input.rule_id);
 	if (ruleId && (!RULE_IDS.has(ruleId) || ruleId.length > 128)) throw new errs.ValidationError("Invalid rule_id");
 	const includeOperational = input.include_operational === undefined ? false : enumFilter("include_operational", new Set(["true", "false"])) === "true";
-	return { from, to, query, status, statusClass, hostId, clientIp, ruleId, includeOperational, eventType: enumFilter("event_type", eventTypes), severity: enumFilter("severity", severities), method: enumFilter("method", methods), limit: input.limit === undefined ? PAGE_DEFAULT : parseInteger(input.limit, "limit", 1, PAGE_MAX), cursor: decodeCursor(input.cursor, ["t", "i"]) };
+	return { from, to, query, status, statusClass, hostId, accessListId, clientIp, ruleId, includeOperational, eventType: enumFilter("event_type", eventTypes), severity: enumFilter("severity", severities), method: enumFilter("method", methods), limit: input.limit === undefined ? PAGE_DEFAULT : parseInteger(input.limit, "limit", 1, PAGE_MAX), cursor: decodeCursor(input.cursor, ["t", "i"]) };
 };
 
 const listEvents = async (access, input) => {
@@ -137,6 +140,7 @@ const listEvents = async (access, input) => {
 	// records and is honoured on its own; the toggle only governs the default mix.
 	if (!f.includeOperational && f.eventType !== OPERATIONAL_EVENT_TYPE) query.whereNot("e.event_type", OPERATIONAL_EVENT_TYPE);
 	if (f.hostId) query.andWhere("e.proxy_host_id", f.hostId);
+	if (f.accessListId) query.andWhere("p.access_list_id", f.accessListId);
 	if (f.eventType) query.andWhere("e.event_type", f.eventType);
 	if (f.severity) query.andWhere("e.severity", f.severity);
 	if (f.ruleId) query.andWhere("e.rule_id", f.ruleId);
@@ -165,30 +169,34 @@ const getEvent = async (access, eventId) => {
  * therefore also up to one TTL behind. See lib/security-memo.js for why.
  */
 const overviewCache = createMemo({ ttlMs: 30_000, maxEntries: 200 });
-// Every input that changes the result: who is asking, what they can see, and
-// over what window.
-const overviewCacheKey = (actor, range) => JSON.stringify([actor.admin, actor.visibility, actor.userId, range]);
+// Every input that changes the result: who is asking, what they can see, over
+// what window, and narrowed to which access list.
+const overviewCacheKey = (actor, range, listId) => JSON.stringify([actor.admin, actor.visibility, actor.userId, range, listId ?? null]);
 
 const rangeSince = (range) => {
 	if (!["24h", "7d", "30d"].includes(range)) throw new errs.ValidationError("Invalid range");
 	return Date.now() - ({ "24h": 86400000, "7d": 7 * 86400000, "30d": 30 * 86400000 }[range]);
 };
-const visibleBase = (actor, since) => applyVisibleEvents(databaseFactory()("security_event as e"), actor).where("e.occurred_at_ms", ">=", since);
+const visibleBase = (actor, since, listId) => {
+	const query = applyVisibleEvents(databaseFactory()("security_event as e"), actor).where("e.occurred_at_ms", ">=", since);
+	return listId ? query.andWhere("p.access_list_id", listId) : query;
+};
 const top = async (query, fields, order = "count") => (await query.select(fields).count("e.id as count").groupBy(fields).orderBy(order, "desc").limit(10)).map((row) => ({ ...row, count: Number(row.count) }));
-const overview = async (access, range) => {
+const overview = async (access, range, accessListId) => {
 	const actor = await securityAccess(access, "security:overview");
-	// Authorization and range validation stay ahead of the cache, so neither a
-	// revoked permission nor a bad range can be served from it.
+	// Authorization, range, and filter validation stay ahead of the cache, so
+	// neither a revoked permission nor a bad input can be served from it.
+	const listId = parseAccessListId(accessListId);
 	const since = rangeSince(range);
-	const cacheKey = overviewCacheKey(actor, range);
+	const cacheKey = overviewCacheKey(actor, range, listId);
 	const cached = overviewCache.read(cacheKey);
 	if (cached) return cached;
-	const totals = await visibleBase(actor, since).first().sum({ total_events: databaseFactory().raw("case when e.event_type <> 'nginx_error' then 1 else 0 end"), operational_events: databaseFactory().raw("case when e.event_type = 'nginx_error' then 1 else 0 end"), exploit_rule_matches: databaseFactory().raw("case when e.event_type = 'exploit_rule' then 1 else 0 end"), status_401: databaseFactory().raw("case when e.status = 401 then 1 else 0 end"), status_403: databaseFactory().raw("case when e.status = 403 then 1 else 0 end"), status_404: databaseFactory().raw("case when e.status = 404 then 1 else 0 end"), status_429: databaseFactory().raw("case when e.status = 429 then 1 else 0 end"), status_5xx: databaseFactory().raw("case when e.status >= 500 then 1 else 0 end") });
+	const totals = await visibleBase(actor, since, listId).first().sum({ total_events: databaseFactory().raw("case when e.event_type <> 'nginx_error' then 1 else 0 end"), operational_events: databaseFactory().raw("case when e.event_type = 'nginx_error' then 1 else 0 end"), exploit_rule_matches: databaseFactory().raw("case when e.event_type = 'exploit_rule' then 1 else 0 end"), status_401: databaseFactory().raw("case when e.status = 401 then 1 else 0 end"), status_403: databaseFactory().raw("case when e.status = 403 then 1 else 0 end"), status_404: databaseFactory().raw("case when e.status = 404 then 1 else 0 end"), status_429: databaseFactory().raw("case when e.status = 429 then 1 else 0 end"), status_5xx: databaseFactory().raw("case when e.status >= 500 then 1 else 0 end") });
 	// Every aggregate below is a *security* view. Error-log rows carry no client
 	// IP, status, method or rule, so most top-N lists already skipped them --
 	// but they do carry a proxy_host_id, which silently ranked top_hosts by
 	// error-log volume rather than by attack surface.
-	const base = () => visibleBase(actor, since).whereNot("e.event_type", OPERATIONAL_EVENT_TYPE);
+	const base = () => visibleBase(actor, since, listId).whereNot("e.event_type", OPERATIONAL_EVENT_TYPE);
 	const [distincts, timeline, topRules, topSources, topHosts, topStatuses, topMethods, newest] = await Promise.all([
 		// The top-N lists stop at ten, so they cannot answer "how many sources in
 		// total" -- which is the headline the findings page leads with.
@@ -197,7 +205,7 @@ const overview = async (access, range) => {
 		top(base().whereNotNull("e.rule_id"), ["e.rule_id"]), top(base().whereNotNull("e.client_ip"), ["e.client_ip"]), top(base().whereNotNull("e.proxy_host_id"), ["e.proxy_host_id"]), top(base().whereNotNull("e.status"), ["e.status"]), top(base().whereNotNull("e.method"), ["e.method"]),
 		// Collector liveness must consider every kind of record, including the
 		// operational ones the security views exclude.
-		visibleBase(actor, since).max("e.occurred_at_ms as occurred_at_ms").first(),
+		visibleBase(actor, since, listId).max("e.occurred_at_ms as occurred_at_ms").first(),
 	]);
 	const num = (value) => Number(value) || 0;
 	const collector = actor.admin
@@ -369,4 +377,4 @@ const resetSecurityApiTestState = () => {
 	activeScans = 0;
 };
 
-export { applyVisibleEvents, authorizeHost, configureSecurityApiForTesting, escapeLike, getEvent, getRetention, listEvents, listLogFiles, literalSearch, overview, rangeSince, readLog, registerSecurityCache, resetSecurityApiTestState, rules, securityAccess, securityDatabase, updateRetention, validateEventFilters };
+export { applyVisibleEvents, authorizeHost, configureSecurityApiForTesting, escapeLike, getEvent, getRetention, listEvents, listLogFiles, literalSearch, overview, parseAccessListId, rangeSince, readLog, registerSecurityCache, resetSecurityApiTestState, rules, securityAccess, securityDatabase, updateRetention, validateEventFilters };

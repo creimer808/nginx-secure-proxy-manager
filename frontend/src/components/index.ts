@@ -1,3 +1,4 @@
+export * from "./AccessListFilter";
 export * from "./Button";
 export * from "./EmptyData";
 export * from "./ErrorNotFound";

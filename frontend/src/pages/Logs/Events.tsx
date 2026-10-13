@@ -93,6 +93,7 @@ function Events({ params, update }: EventsProps) {
 			from: params.get("from") || undefined,
 			to: params.get("to") || undefined,
 			proxyHostId: toNumber(params.get("proxyHostId")),
+			accessListId: toNumber(params.get("accessListId")),
 			eventType: (params.get("eventType") as SecurityEventType) || undefined,
 			severity: (params.get("severity") as SecuritySeverity) || undefined,
 			ruleId: params.get("ruleId") || undefined,

@@ -362,6 +362,8 @@ export interface SecurityEventFilters {
 	from?: string;
 	to?: string;
 	proxyHostId?: number;
+	/** Narrows events to hosts protected by one access list. */
+	accessListId?: number;
 	eventType?: SecurityEventType;
 	severity?: SecuritySeverity;
 	ruleId?: string;

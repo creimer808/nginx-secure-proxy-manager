@@ -37,14 +37,14 @@ router
 	.all(jwtdecode())
 
 	/**
-	 * GET /reports/dashboard?range=24h|7d|30d
+	 * GET /reports/dashboard?range=24h|7d|30d&access_list_id=<id>
 	 *
 	 * The response may contain raw client IP addresses, so it is never cached.
 	 */
 	.get(async (req, res, next) => {
 		try {
 			const range = req.query.range;
-			const data = await internalReport.getDashboardReport(res.locals.access, range);
+			const data = await internalReport.getDashboardReport(res.locals.access, range, req.query.access_list_id);
 			// Override the global no-cache header: raw IPs must not be stored by shared caches.
 			res.set("Cache-Control", "private, no-store");
 			res.status(200).send(data);

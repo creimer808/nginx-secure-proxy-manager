@@ -3,7 +3,7 @@ import cn from "classnames";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { DashboardRange, DashboardReport, DashboardSeriesPoint } from "src/api/backend";
-import { Button, Loading, MetricCard, MetricGrid, TrendChart, type TrendSeriesKey } from "src/components";
+import { AccessListFilter, Button, Loading, MetricCard, MetricGrid, TrendChart, type TrendSeriesKey } from "src/components";
 import { useDashboardReport, useSecurityFindings } from "src/hooks";
 import { getLocale, T } from "src/locale";
 import { formatBytes, formatNumber } from "src/modules/Format";
@@ -61,7 +61,8 @@ const fillSeriesGaps = (
 
 const SecurityTrafficDashboard = () => {
 	const [range, setRange] = useState<DashboardRange>("24h");
-	const { data, isLoading, isError, isFetching, refetch } = useDashboardReport(range);
+	const [accessListId, setAccessListId] = useState<number | undefined>(undefined);
+	const { data, isLoading, isError, isFetching, refetch } = useDashboardReport(range, accessListId);
 
 	const disabled = data && data.collection.enabled === false;
 	const noVisibleHosts = !!data && data.posture.enabled + data.posture.disabled === 0;
@@ -87,6 +88,7 @@ const SecurityTrafficDashboard = () => {
 							<T id="dashboard.metrics.updating" />
 						</span>
 					)}
+					<AccessListFilter value={accessListId} onChange={setAccessListId} />
 					<div className={styles.rangeGroup} role="group" aria-labelledby="security-traffic-heading">
 						{RANGES.map((value) => (
 							<button
@@ -133,7 +135,7 @@ const SecurityTrafficDashboard = () => {
 					</div>
 				) : (
 					<>
-						<Summary report={data} />
+						<Summary report={data} accessListId={accessListId} />
 						{isError && (
 							<div className="alert alert-warning mb-0" role="alert">
 								<T id="dashboard.metrics.error" />
@@ -181,8 +183,8 @@ interface SectionProps {
  * request fails: a missing findings count must not take the traffic dashboard
  * down with it.
  */
-const OpenFindings = ({ range }: { range: DashboardRange }) => {
-	const { data } = useSecurityFindings(range);
+const OpenFindings = ({ range, accessListId }: { range: DashboardRange; accessListId?: number }) => {
+	const { data } = useSecurityFindings(range, accessListId);
 	if (!data) {
 		return null;
 	}
@@ -199,7 +201,7 @@ const OpenFindings = ({ range }: { range: DashboardRange }) => {
 	);
 };
 
-const Summary = ({ report }: SectionProps) => {
+const Summary = ({ report, accessListId }: SectionProps & { accessListId?: number }) => {
 	const { traffic } = report;
 	return (
 		<section aria-labelledby="metrics-summary-heading">
@@ -231,10 +233,10 @@ const Summary = ({ report }: SectionProps) => {
 					icon={<IconServerOff aria-hidden="true" />}
 					tone="red"
 				/>
-				<OpenFindings range={report.range} />
-			</MetricGrid>
-		</section>
-	);
+			<OpenFindings range={report.range} accessListId={accessListId} />
+		</MetricGrid>
+	</section>
+);
 };
 
 const TREND_SERIES: TrendSeriesKey[] = [

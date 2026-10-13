@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { SecurityCollectorHealth, SecurityCountItem, SecurityOverview, SecurityRange } from "src/api/backend";
 import {
+	AccessListFilter,
 	LoadingPage,
 	MetricCard,
 	MetricGrid,
@@ -161,8 +162,9 @@ const Top = ({
 
 function Overview() {
 	const [range, setRange] = useState<SecurityRange>("24h");
-	const overview = useSecurityOverview(range);
-	const findings = useSecurityFindings(range);
+	const [accessListId, setAccessListId] = useState<number | undefined>(undefined);
+	const overview = useSecurityOverview(range, accessListId);
+	const findings = useSecurityFindings(range, accessListId);
 	if (overview.isLoading) return <LoadingPage noLogo />;
 	if (overview.isError || !overview.data) return <QueryError onRetry={() => overview.refetch()} />;
 	const data = overview.data;
@@ -178,7 +180,10 @@ function Overview() {
 					</h3>
 					<Collector health={data.collector} />
 				</div>
-				<RangeSelector value={range} onChange={setRange} />
+				<div className="d-flex align-items-center gap-2 flex-wrap">
+					<AccessListFilter value={accessListId} onChange={setAccessListId} />
+					<RangeSelector value={range} onChange={setRange} />
+				</div>
 			</div>
 			<div className="mt-3">
 				<MetricGrid>
