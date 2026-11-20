@@ -1,8 +1,8 @@
 import {
 	IconBook,
 	IconDeviceDesktop,
-	IconFileText,
 	IconHome,
+	IconListSearch,
 	IconLock,
 	IconSettings,
 	IconShield,
@@ -86,6 +86,13 @@ const menuItems: MenuItem[] = [
 		permission: VIEW,
 	},
 	{
+		to: "/logs",
+		icon: IconListSearch,
+		label: "logs.title",
+		permissionSection: PROXY_HOSTS,
+		permission: VIEW,
+	},
+	{
 		to: "/certificates",
 		icon: IconShield,
 		label: "certificates",
@@ -102,12 +109,6 @@ const menuItems: MenuItem[] = [
 		to: "/audit-log",
 		icon: IconBook,
 		label: "auditlogs",
-		permissionSection: ADMIN,
-	},
-	{
-		to: "/logs",
-		icon: IconFileText,
-		label: "logs",
 		permissionSection: ADMIN,
 	},
 	{

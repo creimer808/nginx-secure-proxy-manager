@@ -1,0 +1,105 @@
+.metricCard {
+	--metric-color: var(--tblr-primary);
+	--metric-rgb: var(--tblr-primary-rgb);
+	position: relative;
+	overflow: hidden;
+}
+
+.metricCard::after {
+	position: absolute;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	height: 2px;
+	background: var(--metric-color);
+	content: "";
+}
+
+/* An actionable card is a button or a link, so it must not inherit the
+   surrounding text alignment or the user agent's control styling. */
+.metricAction {
+	display: block;
+	width: 100%;
+	padding: 0;
+	border: var(--tblr-border-width) solid var(--tblr-border-color);
+	color: inherit;
+	text-align: left;
+	text-decoration: none;
+	transition: border-color 120ms ease;
+}
+
+.metricAction:hover,
+.metricAction:focus-visible {
+	border-color: var(--metric-color);
+	color: inherit;
+}
+
+.metricBlue {
+	--metric-color: var(--tblr-blue);
+	--metric-rgb: var(--tblr-blue-rgb);
+}
+
+.metricAzure {
+	--metric-color: var(--tblr-azure);
+	--metric-rgb: var(--tblr-azure-rgb);
+}
+
+.metricGreen {
+	--metric-color: var(--tblr-green);
+	--metric-rgb: var(--tblr-green-rgb);
+}
+
+.metricYellow {
+	--metric-color: var(--tblr-yellow);
+	--metric-rgb: var(--tblr-yellow-rgb);
+}
+
+.metricOrange {
+	--metric-color: var(--tblr-orange);
+	--metric-rgb: var(--tblr-orange-rgb);
+}
+
+.metricRed {
+	--metric-color: var(--tblr-red);
+	--metric-rgb: var(--tblr-red-rgb);
+}
+
+.metricValue {
+	margin-top: 0.25rem;
+	font-size: 1.625rem;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.025em;
+	line-height: 1.2;
+}
+
+.metricHint {
+	margin-top: 0.15rem;
+	color: var(--tblr-secondary);
+	font-size: 0.75rem;
+}
+
+.metricIcon {
+	display: inline-flex;
+	flex: 0 0 auto;
+	align-items: center;
+	justify-content: center;
+	width: 2.5rem;
+	height: 2.5rem;
+	border-radius: var(--tblr-border-radius);
+	background: rgba(var(--metric-rgb), 0.12);
+	color: var(--metric-color);
+}
+
+.metricIcon svg {
+	width: 1.25rem;
+	height: 1.25rem;
+	stroke-width: 1.8;
+}
+
+/** A row of these should wrap rather than squeeze below a readable width. */
+.metricGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+	gap: 0.75rem;
+}

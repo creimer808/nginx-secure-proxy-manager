@@ -12,16 +12,17 @@
 
 | Version | Value |
 | --- | --- |
-| NSPM application | `0.1.4` |
+| NSPM application | `0.1.5` |
 | Nginx Proxy Manager compatibility baseline | `2.17.1` |
 
-NSPM releases use their own semantic version (`v0.1.4`). The upstream baseline is shown separately so users can determine which stable NPM release supplied the core behavior. See [UPSTREAM.md](UPSTREAM.md) for the synchronization policy.
+NSPM releases use their own semantic version (`v0.1.5`). The upstream baseline is shown separately so users can determine which stable NPM release supplied the core behavior. See [UPSTREAM.md](UPSTREAM.md) for the synchronization policy.
 
 ## Features
 
 - NPM-compatible proxy hosts, redirections, streams, certificates, access lists, users, permissions, and audit log.
 - A security and traffic dashboard for recent request volume, status trends, and potentially suspicious sources.
 - A permission-aware Security investigation page with attributed built-in rule matches, searchable detailed events, raw-log browsing, and bounded retention.
+- Detection independent of blocking: every host is told what matched, whether or not it enforces, across path probes, injection payloads, and scanner tooling as well as the inherited exploit signatures.
 - Let's Encrypt certificates, custom certificates, and advanced Nginx configuration.
 - Multi-architecture container images for `amd64` and `arm64`.
 
@@ -33,7 +34,7 @@ NSPM releases use their own semantic version (`v0.1.4`). The upstream baseline i
 ```yaml
 services:
   app:
-    image: ghcr.io/creimer808/nginx-secure-proxy-manager:0.1.4
+    image: ghcr.io/creimer808/nginx-secure-proxy-manager:0.1.5
     restart: unless-stopped
     ports:
       - "80:80"

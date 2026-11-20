@@ -2,11 +2,13 @@ import * as api from "./base";
 import type { DashboardRange, DashboardReport } from "./responseTypes";
 
 /**
- * Fetch the Security & Traffic dashboard report. An optional AbortSignal lets
+ * Fetch the Security & Traffic dashboard report. An optional access-list id
+ * narrows every metric to hosts in that list. An optional AbortSignal lets
  * React Query cancel stale requests when the range changes.
  */
 export async function getDashboardReport(
 	range: DashboardRange,
+	accessListId?: number,
 	signal?: AbortSignal,
 ): Promise<DashboardReport> {
 	const abortController = new AbortController();
@@ -17,5 +19,5 @@ export async function getDashboardReport(
 			signal.addEventListener("abort", () => abortController.abort(), { once: true });
 		}
 	}
-	return await api.get({ url: "/reports/dashboard", params: { range } }, abortController);
+	return await api.get({ url: "/reports/dashboard", params: { range, accessListId } }, abortController);
 }

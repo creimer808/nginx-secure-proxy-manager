@@ -54,30 +54,6 @@ export interface AuditLog {
 	user?: User;
 }
 
-export type LogSourceType = "system" | "letsencrypt" | "host";
-export type LogHostType = "proxy" | "redirection" | "dead" | "stream";
-// Which of the two files nginx writes per host - named "channel", not "stream",
-// to avoid confusion with the "stream" LogHostType (TCP/UDP stream hosts).
-export type LogChannel = "access" | "error";
-
-export interface LogHostOption {
-	id: number;
-	label: string;
-}
-
-export interface LogSources {
-	system: { label: string };
-	letsencrypt: { label: string };
-	hosts: Record<LogHostType, LogHostOption[]>;
-}
-
-export interface LogTail {
-	lines: string[];
-	size: number;
-	truncated: boolean;
-	exists: boolean;
-}
-
 export interface AccessList {
 	id?: number;
 	createdOn?: string;
@@ -290,7 +266,12 @@ export interface SecurityOverview {
 	range: SecurityRange;
 	totalEvents: number;
 	exploitRuleMatches: number;
+	/** Nginx error-log records: operational observations, excluded from totalEvents. */
+	operationalEvents: number;
+	/** @deprecated Retained alias for operationalEvents. */
 	nginxErrors: number;
+	distinctSources: number;
+	distinctHosts: number;
 	statuses: { "401": number; "403": number; "404": number; "429": number; "5xx": number };
 	timeline: SecurityTimelineItem[];
 	topRules: SecurityCountItem[];
@@ -342,6 +323,40 @@ export interface SecurityEvent {
 	nginxErrorMessage?: string | null;
 }
 
+export type SecurityFindingType =
+	| "path_scanning"
+	| "credential_brute_force"
+	| "rule_match_campaign"
+	| "forced_browsing"
+	| "rate_limit_tripping"
+	| "scanner_tooling"
+	| "error_spike";
+
+export interface SecurityFinding {
+	id: string;
+	type: SecurityFindingType;
+	severity: SecuritySeverity;
+	/** Describes service health rather than a security concern. */
+	operational: boolean;
+	firstSeen: number;
+	lastSeen: number;
+	evidenceCount: number;
+	subject: { clientIp: string | null; proxyHostId: number | null; hostDomain: string | null };
+	metrics: { distinctUris?: number; distinctHosts?: number; distinctRules?: number; baselinePerHour?: number; peakPerHour?: number };
+	/** Event filter that reproduces the evidence, ready to become a /logs query string. */
+	filter: SecurityEventFilters;
+}
+
+export interface SecurityFindingReport {
+	range: SecurityRange;
+	generatedAt: number;
+	window: { from: number; to: number };
+	/** Counts of returned findings; a lower bound on qualifying findings when truncated. */
+	counts: Record<SecuritySeverity, number>;
+	truncated: boolean;
+	findings: SecurityFinding[];
+}
+
 export interface SecurityEventPage { items: SecurityEvent[]; nextCursor: string | null; }
 export interface SecurityRule { id: string; category: string; description: string; action: string; rulesetVersion: string; count: number; }
 export interface SecurityLogFile { rotation: string; compressed: boolean; available: boolean; }
@@ -355,9 +370,13 @@ export interface SecurityEventFilters {
 	from?: string;
 	to?: string;
 	proxyHostId?: number;
+	/** Narrows events to hosts protected by one access list. */
+	accessListId?: number;
 	eventType?: SecurityEventType;
 	severity?: SecuritySeverity;
 	ruleId?: string;
+	/** Catalog category, resolved to catalog rule IDs by the API. */
+	ruleCategory?: string;
 	clientIp?: string;
 	status?: number;
 	statusClass?: "5xx";
@@ -365,4 +384,6 @@ export interface SecurityEventFilters {
 	query?: string;
 	limit?: number;
 	cursor?: string;
+	/** Nginx error-log records are operational and excluded unless asked for. */
+	includeOperational?: "true" | "false";
 }

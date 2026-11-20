@@ -1,0 +1,85 @@
+.page {
+	overflow-wrap: anywhere;
+}
+
+.tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin: 1rem 0;
+}
+
+.filterPanel {
+	display: grid;
+	gap: 0.75rem;
+	margin-bottom: 1rem;
+	padding: 0.85rem 1rem;
+	border: var(--tblr-border-width) solid var(--tblr-border-color);
+	border-radius: var(--tblr-border-radius);
+}
+
+.rangeRow {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem 1.25rem;
+	align-items: end;
+}
+
+.customRange {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+	gap: 0.75rem;
+}
+
+.filters {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+	gap: 0.75rem;
+}
+
+.chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	align-items: center;
+}
+
+/* Chips are buttons that remove their own filter, so they must not inherit the
+   user agent's control chrome on top of the badge styling. */
+.chips > .badge {
+	border: 0;
+	cursor: pointer;
+}
+
+/* A URI or user agent can be kilobytes long; the row must not become the page. */
+.uriCell {
+	display: inline-block;
+	max-width: 22rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	vertical-align: bottom;
+}
+
+.detailGrid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+	gap: 0.75rem 1rem;
+}
+
+.detailValue {
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
+}
+
+.rawLine {
+	display: flex;
+	gap: 0.5rem;
+	align-items: start;
+	padding: 0.25rem 0;
+}
+
+.rawLine code {
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
+}

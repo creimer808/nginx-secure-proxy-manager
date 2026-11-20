@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import net from "node:net";
+import { BLOCKING_RULE_IDS, RULE_ACTION_BLOCK, RULE_ACTION_DETECT, RULE_ID_PREFIXES } from "./security-rule-catalog.js";
 
 const MAX_EVENT_BYTES = 256 * 1024;
 const SECURITY_SCHEMA_VERSION = "1";
@@ -7,7 +8,7 @@ const EVENT_TYPES = new Set(["exploit_rule", "http_status"]);
 const SEVERITIES = new Set(["low", "medium", "high", "critical"]);
 const METHOD_PATTERN = /^[!#$%&'*+.^_`|~0-9A-Z-]{1,32}$/;
 const OBSERVATION_STATUSES = new Set([401, 403, 404, 429]);
-const RULE_ID = /^(?:sql|file|common|php|lfi|joomla|spam|ua)\.[a-z0-9-]+$/;
+const RULE_ID = new RegExp(`^(?:${RULE_ID_PREFIXES.join("|")})\\.[a-z0-9-]+$`);
 
 const asString = (value, name, { required = false, max = 65535 } = {}) => {
 	if (value === undefined || value === null || value === "") {
@@ -68,7 +69,15 @@ const parseSecurityAccessLine = (line, context) => {
 	const status = asInteger(raw.status, "status", { required: true, minimum: 100, maximum: 599 });
 	if (!EVENT_TYPES.has(type) || !SEVERITIES.has(severity)) throw new Error("Invalid event type or severity");
 	if (type === "exploit_rule") {
-		if (!ruleId || !RULE_ID.test(ruleId) || raw.rule_action !== "block" || status !== 403 || severity !== "high") throw new Error("Invalid exploit attribution");
+		if (!ruleId || !RULE_ID.test(ruleId)) throw new Error("Invalid exploit attribution");
+		// A blocked match must be a rule that is actually permitted to block and
+		// must carry the 403 it caused. Detect-only matches changed nothing about
+		// the response, so their status is whatever the request would have got.
+		if (raw.rule_action === RULE_ACTION_BLOCK) {
+			if (!BLOCKING_RULE_IDS.has(ruleId) || status !== 403 || severity !== "high") throw new Error("Invalid exploit attribution");
+		} else if (raw.rule_action !== RULE_ACTION_DETECT || severity !== "medium") {
+			throw new Error("Invalid exploit attribution");
+		}
 	} else if (ruleId || raw.rule_category || raw.rule_action || !(OBSERVATION_STATUSES.has(status) || status >= 500)) {
 		throw new Error("Invalid status observation");
 	}
@@ -87,11 +96,28 @@ const parseSecurityAccessLine = (line, context) => {
 	return parsed;
 };
 
+/**
+ * Nginx error-log severity, mapped honestly.
+ *
+ * An error-log line is an operational observation, not a security finding. A
+ * failed TLS handshake, an upstream timeout, and a client that hung up mid-body
+ * are all routine, and one flapping upstream can emit thousands of them. Tagging
+ * those `high` -- as this did -- buries real detections under infrastructure
+ * noise, so nothing here rises above `medium`, and `high` is reserved for the
+ * access-log side where a rule actually matched.
+ */
+const NGINX_ERROR_SEVERITY = { emerg: "medium", alert: "medium", crit: "medium", error: "low", warn: "low", notice: "low", info: "low", debug: "low" };
+
 const parseNginxErrorLine = (line, context) => {
 	if (Buffer.byteLength(line, "utf8") > MAX_EVENT_BYTES) throw new Error("Nginx error event exceeds maximum size");
 	const match = /^(\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}) \[([a-z]+)\] \d+#\d+: (.*)$/i.exec(line);
+	// Nginx writes the error log in the container's local time with no offset,
+	// and this process shares that container and TZ, so a local-time parse is the
+	// matching one. security-event-parser.test.js pins that, because the format
+	// is non-ISO and the interpretation is engine-defined rather than specified.
 	const occurred = match ? Date.parse(match[1].replaceAll("/", "-")) : Date.now();
-	const event = { occurred_at_ms: Number.isFinite(occurred) ? occurred : Date.now(), proxy_host_id: context.proxyHostId, source_kind: "nginx_error", event_type: "nginx_error", severity: match && /^(?:error|alert)$/i.test(match[2]) ? "high" : "medium", nginx_error_level: match ? match[2].toLowerCase() : "unknown", nginx_error_message: match ? match[3] : line, ingest_segment_id: context.segmentId, ingest_line_offset: context.lineOffset };
+	const level = match ? match[2].toLowerCase() : "unknown";
+	const event = { occurred_at_ms: Number.isFinite(occurred) ? occurred : Date.now(), proxy_host_id: context.proxyHostId, source_kind: "nginx_error", event_type: "nginx_error", severity: NGINX_ERROR_SEVERITY[level] || "low", nginx_error_level: level, nginx_error_message: match ? match[3] : line, ingest_segment_id: context.segmentId, ingest_line_offset: context.lineOffset };
 	event.event_id = canonicalEventId(null, event);
 	return event;
 };
