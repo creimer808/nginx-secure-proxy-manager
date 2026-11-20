@@ -2,6 +2,13 @@
 
 The top-level **Security** page turns locally generated Nginx telemetry into an investigation aid. It complements the lightweight aggregate dashboard; it is not an IDS, SIEM, or proof that a client is malicious or an application was compromised.
 
+Two pages, with a deliberate division:
+
+- **Security** — findings and analysis. What stands out, why, and a link to the evidence.
+- **Logs** — the explorer. Event search with filters, and the raw Nginx logs behind them.
+
+Anything that answers "show me the records themselves" lives under **Logs**. Links to the old `Security → Events` and `Security → Raw Logs` tabs redirect there and keep their filters.
+
 > **v0.1.2 collected no data.** In v0.1.2 the Security page shipped functionally inert. Nginx never received the security logging directive — the startup upgrade's commit gate included a reload that lost a startup race and rolled every host back — and the collector spent its whole per-cycle budget re-hashing existing log archives, so it could never advance a cursor. Both failures were silent: startup logs looked healthy and the page showed an empty but "Available" collector.
 >
 > v0.1.3 fixes both. There is nothing to recover: no telemetry from the v0.1.2 period was ever written, and no backfill is performed. Collection begins from the point v0.1.3 starts.
@@ -10,10 +17,58 @@ The top-level **Security** page turns locally generated Nginx telemetry into an 
 
 A dedicated JSON Lines log is written for each proxy host when either:
 
-- a built-in exploit rule matches; or
+- a built-in rule matches; or
 - the final response is `401`, `403`, `404`, `429`, or `5xx`.
 
-Rule matches include a stable rule ID, category, action, and ruleset version. Status-only events are observations and have no exploit attribution. Exact attribution starts only after the upgraded Nginx configuration is active; older `403` responses cannot be attributed retroactively.
+Rule matches include a stable rule ID, category, action, and ruleset version. Status-only events are observations and have no rule attribution. Exact attribution starts only after the upgraded Nginx configuration is active; older `403` responses cannot be attributed retroactively.
+
+### Detection and blocking are separate
+
+Every host is told what matched, whether or not it blocks. `rule_action` records what actually happened to the request:
+
+| Action | Meaning | Severity |
+| --- | --- | --- |
+| `block` | An upstream-inherited signature matched on a host with **Block Common Exploits** enabled. The request received a `403`. | `high` |
+| `detect` | A match that changed nothing about the response — either a detect-only rule, or an inherited signature on a host that has blocking switched off. | `medium` |
+
+Earlier releases gated attribution on the blocking switch, so a host with **Block Common Exploits** off recorded no rule matches at all. Enabling blocking is no longer a prerequisite for seeing what is being attempted, and turning it on or off does not change which rules are evaluated — only whether the inherited ones return `403`.
+
+The rule catalog has two groups:
+
+- **Inherited signatures** (`sql.*`, `file.*`, `common.*`, `php.*`, `lfi.*`, `joomla.*`, `spam.*`, `ua.*`) come from upstream's `block-exploits.conf`. These are the only rules that can block, and only when the host opts in.
+- **Detect-only rules** (`path.*`, `inject.*`, `scanner.*`) never change a response. Each matches something that is legitimate somewhere — `/actuator` on a Spring host, `/cgi-bin` on genuinely old software — so they are evidence to review, not grounds to break a working site.
+
+Where a request matches both groups, the inherited signature wins, so blocking decisions land exactly where they did before the detect-only rules existed.
+
+### Operational records are not security findings
+
+Nginx error-log lines are collected as `nginx_error` events. They are operational observations: failed TLS handshakes, upstream timeouts, clients that hung up mid-request. One flapping upstream produces thousands, and they carry no client IP, status, method, or rule.
+
+They are therefore excluded from the security totals, the timeline, and every top-N list, and from event search unless `include_operational=true` is set. Nothing operational is recorded above `medium` severity. The raw error logs remain browsable in full.
+
+## Findings
+
+A single 404 is not information. Four hundred distinct 404s from one address in ninety seconds is. The **Security** page leads with findings: patterns computed over the collected events at the moment you ask, with the evidence filter attached to each one.
+
+| Finding | What it looks for |
+| --- | --- |
+| Path scanning | One source, many distinct missing paths |
+| Credential brute force | One source, repeated `401`s against a single host |
+| Rule-match campaign | One source matching several distinct rules |
+| Forced browsing | Sustained `403`s from one source, usually access-list denials |
+| Rate-limit tripping | Clustered `429`s from one source |
+| Scanner tooling | Anything attributed to a `scanner.*` rule |
+| Server error spike | A host's `5xx` rate jumping against its own hourly baseline |
+
+Severity is derived from volume and distinctness rather than mapped from the finding's type, so ten times a threshold reads differently from barely reaching it. A source that trips two unrelated detectors is escalated one level; that correlation is the only route to `critical`.
+
+The error spike is flagged **operational** and kept out of the security counts — a `5xx` cluster is far more often a broken upstream than an attack.
+
+Findings are computed on read from the same indexes the event list uses and never stored. Administrator overview and findings responses are memoized for 30 seconds. Non-administrator requests bypass the memo and check current visible hosts before and after aggregation; an ownership, deletion, or access-list visibility change during the request fails closed with `403` (retry to obtain a fresh report). They are read-only: NSPM does not block addresses, rate-limit, or notify.
+
+"View evidence" opens **Logs** with the detector's source and inclusive millisecond time bounds. Scanner evidence carries `rule_category=scanner`, strictly validated against the built-in catalog and resolved to catalog rule IDs; it intersects with any `rule_id` filter. The Logs page preserves this category and shows a removable filter chip. Error-spike evidence covers only the peak hour intersected with the requested window and explicitly includes operational events, matching that detector's population. Evidence is queried from current retained records, so later retention or visibility changes can reduce the available evidence.
+
+Reports return at most 20 findings per detector and 60 overall. `truncated=true` signals either limit. Severity `counts` describe only the returned findings (including findings marked operational), not an uncapped total; when truncated, their sum is a lower bound on all qualifying findings.
 
 Detailed records include the full URI and query string, request method and protocol, interpreted client IP, immediate peer IP and port, status/upstream status, sizes and timing, TLS metadata, user agent, referrer, and Nginx error text. NSPM does **not** collect request bodies, cookies, `Authorization` values, or arbitrary request headers.
 
@@ -34,7 +89,7 @@ Detailed database events default to **30 days**. Administrators can set an integ
 
 Database retention does not remove raw log rotations, database backups, filesystem snapshots, or copied exports. Security logs rotate daily or at 50 MiB, retain 30 rotations, use delayed gzip compression, and are created with mode `0640`. Database and raw-log retention are intentionally separate.
 
-The collector is bounded per cycle and pauses indexed ingestion when its configured high-water controls activate. Raw source logs remain the evidence source while backlog is deferred. Collector health is shown on the Security Overview; exact global counters are administrator-only.
+The collector is bounded per cycle and pauses indexed ingestion when its configured high-water controls activate. Raw source logs remain the evidence source while backlog is deferred. Collector health is shown on the Security Overview as a status pill, which expands into an alert only when it is degraded; exact global counters are administrator-only.
 
 ### Collector configuration
 
@@ -84,5 +139,7 @@ The static Nginx contract tests run with the backend Node tests. The runtime att
 SECURITY_NGINX_TEST_IMAGE=<candidate-image> \
   node --test backend/lib/security-rules.runtime.test.js
 ```
+
+It mounts the repository's `nginx.conf`, `security-rules.conf`, `block-exploits.conf`, and `log-proxy.conf` over the image, so it tests the working tree against that image's surrounding configuration. It asserts one case per rule, that detect-only rules leave the response untouched, that ordinary traffic produces no record at all, and that an inherited signature still wins over an overlapping detect-only rule.
 
 Do not use an unrelated or stale image when validating a release. MySQL and PostgreSQL migration/API checks should also be run in the repository's database CI matrix before release.
