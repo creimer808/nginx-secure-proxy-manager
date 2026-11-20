@@ -28,7 +28,9 @@ async function appStart() {
 		})
 		.then(() => {
 			internalCertificate.initTimer();
-			internalIpRanges.initTimer();
+			if (IP_RANGES_FETCH_ENABLED) {
+				internalIpRanges.initTimer();
+			}
 			internalTrafficMetrics.initTimer();
 			// The collector is best-effort and handles its own failures so event
 			// ingestion can never prevent the management API from starting.

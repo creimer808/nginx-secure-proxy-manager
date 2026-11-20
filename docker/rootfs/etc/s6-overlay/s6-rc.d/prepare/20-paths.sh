@@ -45,3 +45,7 @@ touch /data/logs/fallback_security.log || true
 chmod 640 /data/logs/fallback_security.log || true
 chmod -R 777 /var/cache/nginx || true
 chmod 644 /etc/logrotate.d/nginx-proxy-manager
+
+# nginx has not been started yet, so any pid file here is stale. Remove it,
+# otherwise a pid file owned by another user stops nginx starting as PUID:PGID
+rm -f /run/nginx/nginx.pid

@@ -12,3 +12,4 @@ docker/dev/resolv.conf
 .pi/
 plans/
 
+test/__pycache__
