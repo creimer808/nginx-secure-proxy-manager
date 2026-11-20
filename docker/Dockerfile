@@ -4,7 +4,7 @@
 # This file assumes that the frontend has been built using ./scripts/frontend-build
 
 # Update these reviewed index digests through the stable upstream-sync process in UPSTREAM.md.
-ARG BASE_IMAGE=nginxproxymanager/nginx-full:certbot-node@sha256:f5e8c2a11d4f91807b9df9f823f6ec90b40366717fc0892fb342866a8eadb240
+ARG BASE_IMAGE=nginxproxymanager/nginx-full:certbot-node@sha256:393d1775030418ff51633a866b85640bdcc95cefcc571ecbd368e7ca5a669b16
 FROM nginxproxymanager/testca@sha256:3e23c78c64789b8e95126589dd502127e57bbad6091a5a88a67ffb87a16f6b6a AS testca
 FROM $BASE_IMAGE
 

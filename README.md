@@ -13,7 +13,7 @@
 | Version | Value |
 | --- | --- |
 | NSPM application | `0.1.4` |
-| Nginx Proxy Manager compatibility baseline | `2.16.0` |
+| Nginx Proxy Manager compatibility baseline | `2.17.1` |
 
 NSPM releases use their own semantic version (`v0.1.4`). The upstream baseline is shown separately so users can determine which stable NPM release supplied the core behavior. See [UPSTREAM.md](UPSTREAM.md) for the synchronization policy.
 
